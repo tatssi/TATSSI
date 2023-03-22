@@ -18,7 +18,7 @@ You can install TATSSI on your favourite Linux distro or if you want to run it o
         Say: ```yes```
     * Close that shell and open a new one
 * Clone this repo
-  * ```git clone https://github.com/GerardoLopez/TATSSI```
+  * ```git clone https://github.com/mcuahutle/TATSSI```
 * Install the required libraries:
   * ```cd TATSSI```
   * ```conda install --file tatssi-package-list.txt```
