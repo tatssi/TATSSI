@@ -1,4 +1,4 @@
-# Tools for Analysing Time Series of Satellite Imagery (TATSSI)
+# Tools for Analyzing Time Series of Satellite Imagery (TATSSI)
 
 <p align="center">
   <img src="https://raw.githubusercontent.com/GerardoLopez/TATSSI/master/TATSSI/UI/static/TATSSI.svg" alt="TATSSI logo" width="40%">
