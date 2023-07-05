@@ -80,7 +80,7 @@ There are some [Jupyter Notebooks](https://jupyter.org/) associated to each modu
 * 2020 Joint Statistical Meetings: [Gerardo Lopez Saldana](https://docs.google.com/presentation/d/1H50s65jyT2G8JmNj8m0BRneFYpD1Ze7UO7lhbnmYaNg/edit?usp=sharing); [Inder Tecuapetla](https://irt466.wixsite.com/inder).
 * A quick glimpse of a simple [plot](https://gerardolopez.github.io/TATSSI/TATSSI/scratch/plotty/VI_QA.html) for EVI and associated QAs.
 
-## Publications $\color{green}{\mbox{(New!)}}$
+## Publications <code style="color:orangered">New!</code>
 * TATSSI: A Free and Open-Source Platform for Analyzing Earth Observation Products with Quality Data Assessment. [International Journal of Geo-Information](https://www.mdpi.com/2220-9964/10/4).
 
 ### Funding
