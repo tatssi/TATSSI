@@ -73,15 +73,15 @@ There are some [Jupyter Notebooks](https://jupyter.org/) associated to each modu
 
 ### Second workshop videos (In Spanish)
 * First day covered the ```Downloaders```, ```Time Series Generation```, ```QA Analytics```, ```Interpolation``` and ```Smoothing``` TATSSI modules. [YouTube video](https://www.youtube.com/watch?v=zNnw0WbnIoo&ab_channel=BiodiversidadMexicana).
-* [Second day](https://www.youtube.com/watch?v=2S6J-8b7z4k&t=4739s&ab_channel=BiodiversidadMexicana) showing the ```Time Series Analysis``` TATSSI module.
+* Second day covered the ```Time Series Analysis``` TATSSI module. [YouTube video](https://www.youtube.com/watch?v=2S6J-8b7z4k&t=4739s&ab_channel=BiodiversidadMexicana).
 
 ## Seminars & Presentations 
 * Red Latinoamericana de Teledetección e Incendios Forestales. [YouTube video](https://www.youtube.com/watch?v=r9rMjjKiC1s&t=24s).
-* 2020 Joint Statistical Meetings: [Gerardo Lopez Saldana](https://docs.google.com/presentation/d/1H50s65jyT2G8JmNj8m0BRneFYpD1Ze7UO7lhbnmYaNg/edit?usp=sharing); [Inder Tecuapetla](https://irt466.wixsite.com/inder)
-* A quick glimpse of a simple [plot](https://gerardolopez.github.io/TATSSI/TATSSI/scratch/plotty/VI_QA.html) for EVI and associated QAs 
+* 2020 Joint Statistical Meetings: [Gerardo Lopez Saldana](https://docs.google.com/presentation/d/1H50s65jyT2G8JmNj8m0BRneFYpD1Ze7UO7lhbnmYaNg/edit?usp=sharing); [Inder Tecuapetla](https://irt466.wixsite.com/inder).
+* A quick glimpse of a simple [plot](https://gerardolopez.github.io/TATSSI/TATSSI/scratch/plotty/VI_QA.html) for EVI and associated QAs.
 
 ## Publications :star: ${\color{gold}{\mbox{NEW\!}}}$ :star:
-* TATSSI: A Free and Open-Source Platform for Analyzing Earth Observation Products with Quality Data Assessment. [International Journal of Geo-Information](https://www.mdpi.com/2220-9964/10/4)
+* TATSSI: A Free and Open-Source Platform for Analyzing Earth Observation Products with Quality Data Assessment. [International Journal of Geo-Information](https://www.mdpi.com/2220-9964/10/4).
 
 ### Funding
 TATSSI is funded by "Convocatoria de Proyectos de Desarrollo Científico para Atender Problemas Nacionales 2016" Project No. 2760; P.I.: Inder Tecuapetla. Collaborators: Gerardo Lopez Saldana, Rainer Ressl and Isabel Cruz.
