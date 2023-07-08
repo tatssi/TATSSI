@@ -78,6 +78,9 @@ class Smoothing():
         # Create output array
         # Smooth data like a porco!
         y = self.data[self.dataset_name]
+        # mask:
+        fill_value = y.nodatavals[0]
+        mask_array = np.isfinite(y.where(y != fill_value).mean("time"))
 
         # Only for smoothn
         if self.smoothing_method == 'smoothn':
@@ -95,7 +98,7 @@ class Smoothing():
         # with ProgressBar():
         #     smoothed_data = smoothed_data.compute()
 
-        save_dask_array(fname=self.output_fname, data=smoothed_data,
+        save_dask_array(fname=self.output_fname, data=smoothed_data.where(mask_array == 1,fill_value),
                 data_var=self.dataset_name, method=self.smoothing_method,
                 progressBar=self.progressBar)
                 #dask=False)

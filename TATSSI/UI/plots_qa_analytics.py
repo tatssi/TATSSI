@@ -297,7 +297,8 @@ class PlotInterpolation(QtWidgets.QMainWindow):
         data_range = max_val - min_val
         max_val = max_val + (data_range * 0.2)
         min_val = min_val - (data_range * 0.2)
-        self.ts_p.set_ylim([min_val, max_val])
+        if self.version != "000":
+            self.ts_p.set_ylim([min_val, max_val])
 
         # Legend
         self.ts_p.legend(loc='best', fontsize='small',
@@ -315,6 +316,8 @@ class PlotInterpolation(QtWidgets.QMainWindow):
         """
         # Left plot
         self.left_ds = getattr(self.ts.data, self.data_vars.currentText())
+        if self.version == "000":
+            self.left_ds *= self.mask.where(self.mask > 0)
         self.left_imshow = self.left_ds[0].plot.imshow(cmap='Greys_r',
                 ax=self.left_p, add_colorbar=False,
                 transform=self.projection)

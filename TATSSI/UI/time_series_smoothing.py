@@ -13,6 +13,7 @@ sys.path.append(str(src_dir.absolute()))
 from TATSSI.time_series.smoothn import smoothn
 from TATSSI.time_series.analysis import Analysis
 from TATSSI.time_series.smoothing import Smoothing
+from TATSSI.UI.helpers.utils import *
 #from TATSSI.notebooks.helpers.time_series_smoothing import \
 #        TimeSeriesSmoothing
 
@@ -34,6 +35,8 @@ class TimeSeriesSmoothingUI(QtWidgets.QMainWindow):
         super(TimeSeriesSmoothingUI, self).__init__(parent)
         uic.loadUi('time_series_smoothing.ui', self)
         self.parent = parent
+        with open("ficheroLog.log","a") as file:
+                file.write("Smoothing:\n")
 
         # Set input file name
         self.fname = fname
@@ -93,6 +96,7 @@ class TimeSeriesSmoothingUI(QtWidgets.QMainWindow):
         else:
             self.pbSmooth.setEnabled(True)
 
+    @log("ficheroLog.log")
     def on_pbSmooth_click(self):
         """
         Performs a smoothing for using a specific user selected
@@ -100,6 +104,8 @@ class TimeSeriesSmoothingUI(QtWidgets.QMainWindow):
         """
         # Wait cursor
         QtWidgets.QApplication.setOverrideCursor(Qt.WaitCursor)
+        start = time.time()
+        tiempo_inicial= datetime.now()
 
         # Output file name
         smoothing_methods = self.smoothing_methods.selectedItems()
@@ -132,6 +138,11 @@ class TimeSeriesSmoothingUI(QtWidgets.QMainWindow):
         # Disable progress bar
         self.progressBar.setValue(0)
         self.progressBar.setEnabled(False)
+        end = time.time()
+        tiempo_final= datetime.now()
+        duracion=(end - start)/60.0
+        print("************** Smoothing *********")
+        print("Start:", tiempo_inicial," End: ", tiempo_final, " @minutes: ", duracion)
 
         # Standard cursor
         QtWidgets.QApplication.restoreOverrideCursor()
@@ -235,7 +246,8 @@ class TimeSeriesSmoothingUI(QtWidgets.QMainWindow):
         data_range = max_val - min_val
         max_val = max_val + (data_range * 0.2)
         min_val = min_val - (data_range * 0.2)
-        self.ts_p.set_ylim([min_val, max_val])
+        if max_val > min_val:
+            self.ts_p.set_ylim([min_val, max_val])
 
         # Legend
         self.ts_p.legend(loc='best', fontsize='small',
@@ -277,6 +289,8 @@ class TimeSeriesSmoothingUI(QtWidgets.QMainWindow):
         Populate plots
         """
         self.img_ds = getattr(self.ts.data, self.data_vars.currentText())
+        fill_value = self.img_ds.attrs['nodatavals'][0]
+        self.img_ds = self.img_ds.where(self.img_ds != fill_value )
         # Create plot
         self.img_imshow = self.img_ds[0].plot.imshow(cmap='Greys_r',
                 ax=self.img_p, add_colorbar=False)
@@ -318,6 +332,7 @@ class TimeSeriesSmoothingUI(QtWidgets.QMainWindow):
         # Time series plot
         self.ts_p = plt.subplot2grid((1, 4), (0, 1), colspan=3)
 
+    @log("ficheroLog.log")
     def _plot(self, cmap='viridis', dpi=72):
         """
         From the TATSSI Time Series Analysis object plots:

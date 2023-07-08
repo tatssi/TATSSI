@@ -13,6 +13,7 @@ from TATSSI.time_series.smoothn import smoothn
 from TATSSI.input_output.translate import Translate
 from TATSSI.input_output.utils import *
 from TATSSI.qa.EOS.catalogue import Catalogue
+from TATSSI.UI.helpers.utils import *
 
 # Widgets
 import ipywidgets as widgets
@@ -90,6 +91,7 @@ class TimeSeriesInterpolation():
         log = rio_logging.getLogger()
         log.setLevel(rio_logging.ERROR)
 
+    @log("ficheroLog.log")
     def interpolate(self, tile_size=256, n_workers=1,
                     threads_per_worker=8, memory_limit='14GB',
                     progressBar=None):
@@ -98,6 +100,8 @@ class TimeSeriesInterpolation():
         the method or methods provided
         :param method: list of interpolation methods
         """
+        start = time.time()
+        tiempo_inicial= datetime.now()
         if self.mask is None:
             pass
 
@@ -137,19 +141,24 @@ class TimeSeriesInterpolation():
 
         # Get fill value and idx
         fill_value = tmp_ds.attrs['nodatavals'][0]
-        mask_fill_value = (tmp_ds == fill_value)
-        mask_fill_value = (mask_fill_value * fill_value).astype(dtype)
-        #idx_no_data = np.where(tmp_ds.data == fill_value)
+        if self.version != "000":
+            mask_fill_value = (tmp_ds == fill_value)
+            mask_fill_value = (mask_fill_value * fill_value).astype(dtype)
+            #idx_no_data = np.where(tmp_ds.data == fill_value)
 
-        # Apply mask
-        tmp_ds *= self.mask
-        # Set NaN where there are zeros
-        tmp_ds = tmp_ds.where(tmp_ds != 0)
+            # Apply mask
+            #if self.version == "000":
+            #    self.mask = (tmp_ds != fill_value)
 
-        # Where there were fill values, set the value again to 
-        # fill value to avoid not having data to interpolate
-        #tmp_ds.data[idx_no_data] = fill_value
-        tmp_ds += mask_fill_value
+            tmp_ds *= self.mask
+
+            # Set NaN where there are zeros
+            tmp_ds = tmp_ds.where(tmp_ds != 0)
+
+            # Where there were fill values, set the value again to 
+            # fill value to avoid not having data to interpolate
+            #tmp_ds.data[idx_no_data] = fill_value
+            tmp_ds += mask_fill_value
 
         #tmp_ds[idx_no_data] = fill_value
 
@@ -202,8 +211,12 @@ class TimeSeriesInterpolation():
 
             # Save to file
             fname = f"{self.product}.{self.version}.{data_var}.{method}.tif"
-            output_dir = os.path.join(self.source_dir, data_var[1::],
+            if self.version == "000":
+                output_dir = os.path.join(self.source_dir,
                               'interpolated')
+            else:
+                output_dir = os.path.join(self.source_dir, data_var[1::],
+                                  'interpolated')
 
             if os.path.exists(output_dir) is False:
                 os.mkdir(output_dir)
@@ -223,6 +236,11 @@ class TimeSeriesInterpolation():
             # Remove progress bar
             progress_bar.close()
             del progress_bar
+        end = time.time()
+        tiempo_final= datetime.now()
+        duracion=(end - start)/60.0
+        print("************** Interpolation *********")
+        print("Start:", tiempo_inicial," End: ", tiempo_final, " @minutes: ", duracion)
 
     def __create_plot_objects(self):
         """
@@ -308,6 +326,7 @@ class TimeSeriesInterpolation():
                 layout={'width': '220px'},
         )
 
+    @log("ficheroLog.log")
     def __plot(self, is_qa=False):
         """
         Plot a variable and time series
@@ -447,8 +466,9 @@ class TimeSeriesInterpolation():
         self.ts_p.set_ylim([min_val, max_val])
 
         # Legend
-        self.ts_p.legend(loc='best', fontsize='small',
-                         fancybox=True, framealpha=0.5)
+        if self.version != "000":
+            self.ts_p.legend(loc='best', fontsize='small',
+                            fancybox=True, framealpha=0.5)
 
         # Grid
         self.ts_p.grid(axis='both', alpha=.3)

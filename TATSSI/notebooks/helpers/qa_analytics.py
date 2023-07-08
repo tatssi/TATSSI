@@ -370,16 +370,26 @@ class Analytics():
         :atte self.version: version of the product '006'
         :return QA definitions DataFrame
         """
-        qa_defs = self.catalogue.get_qa_definition(product=self.product,
-                                                   version=self.version)
-        # Convert to binary
-        for qa_def in qa_defs:
-            binary_vals_list = []
-            for qa_value in qa_def.Value:
-                binary_vals_list.append(int(bin(qa_value)[2:]))
+        if self.version == "000":
+            qa_defs =	{
+                    "ProductAndVersion": self.product+"."+self.version,
+                    "QualityLayer": self.product,
+                    "Value": 0,
+                    "Description": "good QA",
+                    "Acceptable": "True",
+                    "Length": 2
+                    }
+        else:
+            qa_defs = self.catalogue.get_qa_definition(product=self.product,
+                                                    version=self.version)
+            # Convert to binary
+            for qa_def in qa_defs:
+                binary_vals_list = []
+                for qa_value in qa_def.Value:
+                    binary_vals_list.append(int(bin(qa_value)[2:]))
 
-            # Update the 'Value' field
-            qa_def['Value'] = binary_vals_list
+                # Update the 'Value' field
+                qa_def['Value'] = binary_vals_list
 
         return qa_defs
 
@@ -418,7 +428,10 @@ class Analytics():
             (number of qa layers, time steps, cols(lat), rows(lon))
         Additionally computes the temporal mask and the max gap length
         """
-        if not type(b) == QProgressBar:
+        for k, v in self.ts.data.data_vars.items():
+            break
+
+        if not type(b) == QProgressBar and not type(b) == 'PyQt5.QtWidgets.QProgressBar':
             progress_bar = IntProgress(
                 value=0,
                 min=0,
@@ -429,50 +442,75 @@ class Analytics():
                 orientation='horizontal',
                 style = {'description_width': 'initial'},
                 layout={'width': '50%'}
-            )
+                )
             display(progress_bar)
-
-        n_qa_layers = len(self.user_qa_selection)
-
-        # Get the name of the first data var to extract its shape
-        for k, v in self.ts.data.data_vars.items():
-            break
+        
+        if self.version == "000":
+            self.user_qa_selection = {
+                "data": [
+                    k,
+                ]
+                }
+            n_qa_layers = 1
+        else:
+            n_qa_layers = len(self.user_qa_selection)
 
         # Create mask xarray
         _time, _latitude, _longitude = self.ts.data.data_vars[k].shape
         mask = np.zeros((n_qa_layers, _time, _latitude, _longitude),
                         np.int8)
 
-        qa_layer = self.qa_def.QualityLayer.unique()
-
         # QA layer user to create mask
-        _qa_layer = getattr(self.ts.qa, f"qa{qa_layer[0]}")
+        if self.version == "000":
+            _qa_layer = self.ts.data
+        else:
+            qa_layer = self.qa_def.QualityLayer.unique()
+            _qa_layer = getattr(self.ts.qa, f"qa{qa_layer[0]}")
 
         for i, user_qa in enumerate(self.user_qa_selection):
 
-            if type(b) == QProgressBar:
+            if type(b) == QProgressBar or type(b) == 'PyQt5.QtWidgets.QProgressBar':
                 b.setValue(i)
                 b.setFormat(f"Masking by QA {user_qa}")
             else:
                 progress_bar.value = i
                 progress_bar.description = f"Masking by QA {user_qa}"
 
-            user_qa_fieldname = user_qa.replace(" ", "_").replace("/", "_")
+            if self.version == "000":
+                user_qa_fieldname = k
+            else:
+                user_qa_fieldname = user_qa.replace(" ", "_").replace("/", "_")
 
             for j, qa_value in enumerate(self.user_qa_selection[user_qa]):
                 qa_value_field_name = qa_value.replace(" ", "_")
 
-                qa_flag_val = self.qa_def[(self.qa_def.Name == user_qa) & 
+                if self.version == "000":
+                    b.setValue(25)
+                    qa_flag_val = v.attrs['nodatavals'][0]
+                else:
+                    qa_flag_val = self.qa_def[(self.qa_def.Name == user_qa) & 
                         (self.qa_def.Description == qa_value)].Value.iloc[0]
 
                 if j == 0 :
-                    mask[i] = (_qa_layer[user_qa_fieldname] == qa_flag_val)
+                    if self.version == "000":
+                        b.setValue(50)
+                        mask[i] = (_qa_layer[user_qa_fieldname] != qa_flag_val)
+                    else:
+                        mask[i] = (_qa_layer[user_qa_fieldname] == qa_flag_val)
                 else:
-                    mask[i] = np.logical_or(
-                            mask[i], _qa_layer[user_qa_fieldname] == qa_flag_val)
+                    if self.version == "000":
+                        b.setValue(75)
+                        mask[i] = np.logical_or(
+                                mask[i], _qa_layer[user_qa_fieldname] != qa_flag_val)
+                    else:
+                        mask[i] = np.logical_or(
+                                mask[i], _qa_layer[user_qa_fieldname] == qa_flag_val)
 
-        if type(b) == QProgressBar:
-            b.setValue(0)
+        if type(b) == QProgressBar or type(b) == 'PyQt5.QtWidgets.QProgressBar':
+            if self.version == "000":
+                b.setValue(95)
+            else:
+                b.setValue(0)
             b.setEnabled(False)
         else:
             # Remove progress bar
@@ -481,6 +519,7 @@ class Analytics():
 
         #self.__temp_mask = mask
         #mask = xr.DataArray(np.all(self.__temp_mask, axis=0),
+
         mask = xr.DataArray(np.all(mask, axis=0),
                             coords=[v.time.data,
                                     v.latitude.data,
@@ -577,7 +616,7 @@ class Analytics():
         bands, rows, cols = self.mask.shape
         max_gap_length = np.zeros((rows, cols), np.int16)
 
-        if not type(b) == QProgressBar:
+        if not type(b) == QProgressBar and not type(b) == 'PyQt5.QtWidgets.QProgressBar':
             progress_bar = IntProgress(
                 value=0,
                 min=0,
@@ -594,7 +633,7 @@ class Analytics():
             b.setEnabled(True)
 
         for i in range(rows):
-            if type(b) == QProgressBar:
+            if type(b) == QProgressBar or type(b) == 'PyQt5.QtWidgets.QProgressBar':
                 b.setFormat('Computing maximum gap length...')
                 b.setValue(int((i*10.)/rows))
             else:
@@ -607,7 +646,7 @@ class Analytics():
                         if _gap_lenght > 0 and _gap_lenght > max_gap_length[i,j]:
                             max_gap_length[i,j] = _gap_lenght
 
-        if type(b) == QProgressBar:
+        if type(b) == QProgressBar or type(b) == 'PyQt5.QtWidgets.QProgressBar':
             b.setValue(0)
             b.setEnabled(False)
         else:
