@@ -55,6 +55,7 @@ Downloading products from the LP DAAC requires a NASA [EarthData](https://urs.ea
 TATSSI is a set of software tools to analise Earth Observation (EO) data. It allows you to:
 
 * Download data from the Land Processes Distributed Active Archive Center ([LP DAAC](https://lpdaac.usgs.gov/))
+* <code style="color:orangered">New!</code> Import GeoTIFF datasets (Landsat, Sentinel, RapidEye, WV2, etc. images)
 * Transform to/from diverse EO raster data formats using [GDAL](https://gdal.org/)
 * Decode the QA-SDS associated to diverse [MODIS](https://lpdaac.usgs.gov/product_search/?collections=Combined+MODIS&collections=Terra+MODIS&collections=Aqua+MODIS&view=list) & [VIIRS](https://lpdaac.usgs.gov/product_search/?query=VIIRS&collections=S-NPP+VIIRS) data.
 * Create time series of the aforementioned products masking by the user-defined QA parameter selection
