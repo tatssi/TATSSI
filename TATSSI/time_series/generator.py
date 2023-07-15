@@ -46,8 +46,12 @@ class Generator():
 
         # Check that the source dir has the requested product
         # to create time series
-        fnames = glob(os.path.join(self.source_dir,
-            f"*{product}*.{version}.*.{data_format}"))
+        if version == "000":
+            fnames = glob(os.path.join(self.source_dir,
+            f"*{product}*.{data_format}"))
+        else:
+            fnames = glob(os.path.join(self.source_dir,
+                f"*{product}*.{version}.*.{data_format}"))
 
         if len(fnames) == 0 and preprocessed == False:
             err_msg = (f"There are no {product} files in "
@@ -100,8 +104,12 @@ class Generator():
             self.start, self.end = None, None
             return
 
-        temporalExtentStart, temporalExtentEnd = \
-            self.__get_product_dates_range()
+        if [ self.version == "000"]:
+            temporalExtentStart = string_to_date(start)
+            temporalExtentEnd = string_to_date(end)
+        else:
+            temporalExtentStart, temporalExtentEnd = \
+                self.__get_product_dates_range()
 
         _start = string_to_date(start)
         if _start >= temporalExtentStart:
@@ -280,6 +288,10 @@ class Generator():
 
         vrt_fnames.sort()
 
+        if self.version == "000":
+            vrt_fnames = glob(os.path.join(self.source_dir,
+                f"*{self.product_name}*.vrt"))
+
         return vrt_fnames
 
     def load_time_series(self, chunked=False):
@@ -300,7 +312,11 @@ class Generator():
         datasets = self.__get_datasets(vrt_fnames, chunked=chunked)
 
         # Get all decoded QA layers
-        qa_layer_names = self.__get_qa_layers()
+        if self.version == "000":
+            qa_vrt_fnames = vrt_fnames
+            qa_layer_names = [self.product_name]
+        else:
+            qa_layer_names = self.__get_qa_layers()
 
         # Insert a 'qa' prefix in case there is an invalid field name
         qa_layer_names_prefix = ['qa' + s for s in qa_layer_names]
@@ -313,14 +329,17 @@ class Generator():
                 qa_layer_wildcard = f"*{qa_layer[1:-1]}*"
             else:
                 qa_layer_wildcard = f"*{qa_layer}*"
-
-            vrt_dir = os.path.join(self.source_dir, qa_layer_wildcard,
-                                   '*', '*.vrt')
+            if self.version == "000":
+                vrt_dir = os.path.join(self.source_dir,
+                    f"*{self.product_name}*.vrt")
+            else:
+                vrt_dir = os.path.join(self.source_dir, qa_layer_wildcard,
+                                       '*', '*.vrt')
             vrt_fnames = glob(vrt_dir)
             vrt_fnames.sort()
 
             if len(vrt_fnames) == 0:
-                raise Exception(f"VRTs dir {vrts} is empty.")
+                raise Exception(f"VRTs dir {vrt_dir} is empty.")
 
             # Set the attribute of the QA layer with the
             # corresponding dataset
@@ -368,6 +387,8 @@ class Generator():
             if level == 0:
                 # Standard layer has an _ prefix
                 dataset_name = f"_{dataset_name}"
+                if self.version == "000":
+                    dataset_name = Path(vrt).stem
 
             # Check that _FillValue is not NaN
             if data_array.nodatavals[0] is np.NaN:

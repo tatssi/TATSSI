@@ -265,9 +265,15 @@ class PlotInterpolation(QtWidgets.QMainWindow):
             left_plot_sd = left_plot_sd.compute()
 
         # Masked data
-        right_plot_sd = self.right_ds.sel(longitude=event.xdata,
+        if self.version == "000":
+            right_plot_sd = self.left_ds.sel(longitude=event.xdata,
                                           latitude=event.ydata,
                                           method='nearest')
+        else:
+            right_plot_sd = self.right_ds.sel(longitude=event.xdata,
+                                          latitude=event.ydata,
+                                          method='nearest')
+    
         if right_plot_sd.chunks is not None:
             right_plot_sd = right_plot_sd.compute()
 
@@ -297,7 +303,8 @@ class PlotInterpolation(QtWidgets.QMainWindow):
         data_range = max_val - min_val
         max_val = max_val + (data_range * 0.2)
         min_val = min_val - (data_range * 0.2)
-        self.ts_p.set_ylim([min_val, max_val])
+        if self.version != "000":
+            self.ts_p.set_ylim([min_val, max_val])
 
         # Legend
         self.ts_p.legend(loc='best', fontsize='small',
@@ -315,6 +322,8 @@ class PlotInterpolation(QtWidgets.QMainWindow):
         """
         # Left plot
         self.left_ds = getattr(self.ts.data, self.data_vars.currentText())
+        if self.version == "000":
+            self.left_ds *= self.mask.where(self.mask > 0)
         self.left_imshow = self.left_ds[0].plot.imshow(cmap='Greys_r',
                 ax=self.left_p, add_colorbar=False,
                 transform=self.projection)
@@ -332,16 +341,21 @@ class PlotInterpolation(QtWidgets.QMainWindow):
                 linestyle = '--', linewidth=1, label='Original data')
 
         # Right panel
-        if self.mask is None:
-            self.right_ds = self.left_ds.copy(deep=True)
-        else:
-            self.right_ds = self.left_ds * self.mask
-            self.right_ds.attrs = self.left_ds.attrs
-
-        # Right plot
-        self.right_imshow = self.right_ds[0].plot.imshow(cmap='Greys_r',
+        if self.version == "000":
+            self.right_imshow = self.left_ds[0].plot.imshow(cmap='Greys_r',
                 ax=self.right_p, add_colorbar=False,
                 transform=self.projection)
+        else:
+            if self.mask is None:
+                self.right_ds = self.left_ds.copy(deep=True)
+            else:
+                self.right_ds = self.left_ds * self.mask
+                self.right_ds.attrs = self.left_ds.attrs
+
+            # Right plot
+            self.right_imshow = self.right_ds[0].plot.imshow(cmap='Greys_r',
+                    ax=self.right_p, add_colorbar=False,
+                    transform=self.projection)
 
         # Turn off axis
         self.right_p.axis('off')

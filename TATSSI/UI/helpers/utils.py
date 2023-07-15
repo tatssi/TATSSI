@@ -51,3 +51,33 @@ def open_file_dialog(dialog_type = 'open',
         return dirname
 
     return str(fname[0])
+
+# decorate for log
+import time
+from datetime import datetime
+def log(fichero_log):
+        def decorador_log(func):
+                def decorador_funcion(*args, **kwargs):
+                        with open(fichero_log, 'a') as opened_file:
+                                inicio = time.time()
+                                date_inicio = datetime.now()
+                                func_name=func.__name__
+                                if func_name == "on_pbSmooth_click" or \
+                                        func_name == "on_btn_QA_Analytics_activated" or \
+                                        func_name == "on_pbCPD_click" or \
+                                        func_name == "on_pbClimatology_click" or \
+                                        func_name == "on_pbDecomposition_click" or \
+                                        func_name == "on_pbAnomalies_click" or \
+                                        func_name == "on_pbMKTest_click" or \
+                                        func_name == "__frequency_analysis":
+                                      output = func(args[0])
+                                else:
+                                        output = func(*args, **kwargs)
+                                fin = time.time()
+                                date_fin = datetime.now()
+                                duracion=(fin - inicio)/60.0
+                                func_name=func.__name__
+                                opened_file.write(f"{func_name,output,date_inicio.isoformat(),date_fin.isoformat(),duracion }\n")
+                        return output
+                return decorador_funcion
+        return decorador_log

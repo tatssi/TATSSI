@@ -187,12 +187,15 @@ class TimeSeriesAnalysisUI(QtWidgets.QMainWindow):
 
         return super().eventFilter(obj, event)
 
+    @log("ficheroLog.log")
     def on_pbMKTest_click(self):
         """
         Compute and save Mann-Kendall test products
         """
         # Wait cursor
         QtWidgets.QApplication.setOverrideCursor(Qt.WaitCursor)
+        start = time.time()
+        tiempo_inicial = datetime.now()
 
         self.progressBar.setEnabled(True)
         msg = f"Computing Mann-Kendall test..."
@@ -301,14 +304,22 @@ class TimeSeriesAnalysisUI(QtWidgets.QMainWindow):
 
         self.progressBar.setValue(0)
         self.progressBar.setEnabled(False)
+        end = time.time()
+        tiempo_final= datetime.now()
+        duracion=(end - start)/60.0
+        print("************** MK Test *********")
+        print("Start:", tiempo_inicial," End: ", tiempo_final, " @minutes: ", duracion)
 
         # Standard cursor
         QtWidgets.QApplication.restoreOverrideCursor()
 
+    @log("ficheroLog.log")
     def __frequency_analysis(self):
         """
         Computes the annual frequency of peaks and valleys
         """
+        start = time.time()
+        tiempo_inicial = datetime.now()
         self.progressBar.setEnabled(True)
         msg = f"Computing one and two-peak annual frequencies..."
         self.progressBar.setFormat(msg)
@@ -383,7 +394,13 @@ class TimeSeriesAnalysisUI(QtWidgets.QMainWindow):
                 n_workers=4, progressBar=self.progressBar)
 
         self.progressBar.setValue(0)
+        end = time.time()
+        tiempo_final= datetime.now()
+        duracion=(end - start)/60.0
+        print("************** Frecuency Analysis  *********")
+        print("Start:", tiempo_inicial," End: ", tiempo_final, " @minutes: ", duracion)
 
+    @log("ficheroLog.log")
     def on_pbDecomposition_click(self):
         """
         Save decomposition products:
@@ -391,6 +408,8 @@ class TimeSeriesAnalysisUI(QtWidgets.QMainWindow):
         """
         # Wait cursor
         QtWidgets.QApplication.setOverrideCursor(Qt.WaitCursor)
+        start = time.time()
+        tiempo_inicial = datetime.now()
 
         # Annual frequency of peaks and valleys
         self.__frequency_analysis()
@@ -412,7 +431,13 @@ class TimeSeriesAnalysisUI(QtWidgets.QMainWindow):
                 center=True).mean().astype(dtype)
         trend.attrs = self.left_ds.attrs
 
-        period_averages = self.left_ds.groupby("time.dayofyear")
+        unique_diffs = np.sort(np.unique(np.diff(self.left_ds.time.dt.month.values)))
+        if unique_diffs[0] == -11 and unique_diffs[1] == 1:
+            _idx = 'time.month'
+        else:
+            _idx = 'time.dayofyear'
+
+        period_averages = self.left_ds.groupby(_idx)
         period_averages = period_averages.mean(axis=0).astype(dtype)
 
         if self.model.currentText()[0] == 'a':
@@ -456,6 +481,11 @@ class TimeSeriesAnalysisUI(QtWidgets.QMainWindow):
 
         self.progressBar.setValue(0)
         self.progressBar.setEnabled(False)
+        end = time.time()
+        tiempo_final= datetime.now()
+        duracion=(end - start)/60.0
+        print("************** Decomposition  *********")
+        print("Start:", tiempo_inicial," End: ", tiempo_final, " @minutes: ", duracion)
 
         # Standard cursor
         QtWidgets.QApplication.restoreOverrideCursor()
@@ -487,12 +517,15 @@ class TimeSeriesAnalysisUI(QtWidgets.QMainWindow):
         # Standard cursor
         QtWidgets.QApplication.restoreOverrideCursor()
 
+    @log("ficheroLog.log")
     def on_pbClimatology_click(self):
         """
         Save to COGs all the time series analysis products
         """
         # Wait cursor
         QtWidgets.QApplication.setOverrideCursor(Qt.WaitCursor)
+        start = time.time()
+        tiempo_inicial = datetime.now()
 
         # Compute climatology
         self.ts.climatology()
@@ -508,7 +541,14 @@ class TimeSeriesAnalysisUI(QtWidgets.QMainWindow):
         var = self.data_vars.currentText()
 
         # Group by day of year to compute quartiles
-        grouped_by_doy = self.ts.data[var].time.groupby("time.dayofyear")
+        unique_diffs = np.sort(np.unique(np.diff(self.ts.data[var].time.dt.month.values)))
+        if unique_diffs[0] == -11 and unique_diffs[1] == 1:
+            _idx = 'time.month'
+            _timeName = 'month'
+        else:
+            _idx = 'time.dayofyear'
+            _timeName = 'DoY'
+        grouped_by_doy = self.ts.data[var].fillna(0).time.groupby(_idx)
         # Get the number of time steps
         n_time_steps = len(grouped_by_doy.groups.keys())
         # rows and cols
@@ -544,8 +584,12 @@ class TimeSeriesAnalysisUI(QtWidgets.QMainWindow):
             # Upper boundary outliers
             upper_boundary_outliers = ts_doy < q_data[3,i]
             upper_boundary_outliers.attrs = ts_doy.attrs
+            if _timeName == 'month':
+                _time = f'{doy:02d}'
+            else:
+                _time = f'{doy:03d}'
             fname = (f'{os.path.splitext(self.fname)[0]}'
-                     f'_upper_boundary_outliers_DoY_{doy:03d}.tif')
+                     f'_upper_boundary_outliers_{_timeName}_{_time}.tif')
 
             save_dask_array(fname=fname,
                             data=upper_boundary_outliers,
@@ -619,6 +663,11 @@ class TimeSeriesAnalysisUI(QtWidgets.QMainWindow):
 
         self.progressBar.setValue(0)
         self.progressBar.setEnabled(False)
+        end = time.time()
+        tiempo_final= datetime.now()
+        duracion=(end - start)/60.0
+        print("************** Climatology *********")
+        print("Start:", tiempo_inicial," End: ", tiempo_final, " @minutes: ", duracion)
 
         # Standard cursor
         QtWidgets.QApplication.restoreOverrideCursor()
@@ -675,6 +724,7 @@ class TimeSeriesAnalysisUI(QtWidgets.QMainWindow):
         self.fig.canvas.draw()
         self.fig.canvas.flush_events()
 
+    @log("ficheroLog.log")
     def on_pbAnomalies_click(self):
         """
         Computes the climatolgy and anomalies for the selected year
@@ -682,6 +732,8 @@ class TimeSeriesAnalysisUI(QtWidgets.QMainWindow):
         """
         # Wait cursor
         QtWidgets.QApplication.setOverrideCursor(Qt.WaitCursor)
+        start = time.time()
+        tiempo_inicial = datetime.now()
 
         first_run = False
 
@@ -735,6 +787,11 @@ class TimeSeriesAnalysisUI(QtWidgets.QMainWindow):
         #        smoothing_methods=[smoothing_method])
 
         #smoother.smooth()
+        end = time.time()
+        tiempo_final= datetime.now()
+        duracion=(end - start)/60.0
+        print("************** Anomalies *********")
+        print("Start:", tiempo_inicial," End: ", tiempo_final, " @minutes: ", duracion)
 
         # Standard cursor
         QtWidgets.QApplication.restoreOverrideCursor()
@@ -905,7 +962,13 @@ class TimeSeriesAnalysisUI(QtWidgets.QMainWindow):
         self.trend_p.plot(left_plot_sd.time.data, trend.data,
                 label=f'Trend (window = {period})')
 
-        period_averages = left_plot_sd.groupby("time.dayofyear").mean()
+        #   Check if data is monthly to group by month
+        unique_diffs = np.sort(np.unique(np.diff(left_plot_sd.time.dt.month.values)))
+        if unique_diffs[0] == -11 and unique_diffs[1] == 1:
+            _idx = 'time.month'
+        else:
+            _idx = 'time.dayofyear'
+        period_averages = left_plot_sd.groupby(_idx).mean()
 
         if self.model.currentText()[0] == 'a':
             period_averages -= period_averages.mean(axis=0)
@@ -1229,12 +1292,15 @@ class TimeSeriesAnalysisUI(QtWidgets.QMainWindow):
 
         self.addToolBar(QtCore.Qt.BottomToolBarArea, toolbar)
 
+    @log("ficheroLog.log")
     def on_pbCPD_click(self):
         """
         Compute change points on the detrended time series
         """
         # Wait cursor
         QtWidgets.QApplication.setOverrideCursor(Qt.WaitCursor)
+        start = time.time()
+        tiempo_inicial = datetime.now()
 
         msg = f"Identifying change points..."
         self.progressBar.setEnabled(True)
@@ -1296,6 +1362,11 @@ class TimeSeriesAnalysisUI(QtWidgets.QMainWindow):
 
         self.progressBar.setValue(0)
         self.progressBar.setEnabled(False)
+        end = time.time()
+        tiempo_final= datetime.now()
+        duracion=(end - start)/60.0
+        print("************** CPD *********")
+        print("Start:", tiempo_inicial," End: ", tiempo_final, " @minutes: ", duracion)
 
         # Standard cursor
         QtWidgets.QApplication.restoreOverrideCursor()

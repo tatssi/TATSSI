@@ -17,6 +17,7 @@ from TATSSI.UI.helpers.utils import *
 
 # TATSSI UI dialogs
 from TATSSI.UI.downloaders import DownloadersUI
+from TATSSI.UI.genericImporter import genericImporterUI
 from TATSSI.UI.time_series_generator import TimeSeriesGeneratorUI
 from TATSSI.UI.qa_analytics import QAAnalyticsUI
 from TATSSI.UI.time_series_smoothing import TimeSeriesSmoothingUI
@@ -30,11 +31,14 @@ class TATSSI_UI(QtWidgets.QMainWindow):
 
         # Connect actions
         self.actionDownloaders.triggered.connect(self._downloaders)
+        self.actionImporter.triggered.connect(self._genericImporter)
         self.actionGenerator.triggered.connect(self._time_series_generator)
         self.actionAnalytics.triggered.connect(self._analytics)
         self.actionSmoothing.triggered.connect(self._time_series_smoothing)
         self.actionAnalysis.triggered.connect(self._time_series_analysis)
         self.actionTATSSI.triggered.connect(self._about)
+        if os.path.isfile("ficheroLog.log"):
+            os.remove("ficheroLog.log")
 
         self.show()
 
@@ -49,6 +53,11 @@ class TATSSI_UI(QtWidgets.QMainWindow):
         Launch the downloaders dialog
         """
         self.downloaders = DownloadersUI(parent=self)
+    def _genericImporter(self):
+        """
+        Launch the downloaders dialog
+        """
+        self.genericImporter = genericImporterUI(parent=self)
 
     def _time_series_generator(self):
         """
