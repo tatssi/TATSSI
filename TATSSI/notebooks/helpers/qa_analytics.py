@@ -65,18 +65,21 @@ class Analytics():
         else:
             print(f"{source_dir} does not exists!")
             return None
-
-        if isinstance(product, str) and len(product) > 3:
-            self.product = product
-        else:
-            print(f"Invalid product: {product}!")
-            return None
-
+        
         if isinstance(version, str) and len(version) == 3:
             self.version = version
         else:
             print(f"Invalid version: {version}!")
             return None
+        
+        if isinstance(product, str) and len(product) > 3:
+            self.product = product
+        elif self.version == "000":
+            self.product = product
+        else:
+            print(f"Invalid product: {product}!")
+            return None
+
 
         # Set number of CPUs to use
         self.__set_n_processes(processes)

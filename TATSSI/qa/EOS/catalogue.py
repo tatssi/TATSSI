@@ -36,8 +36,9 @@ class Catalogue():
 
         # Appeears API services
         # Doc: https://lpdaacsvc.cr.usgs.gov/appeears/api/
-        self.SERVICES_URL = "https://lpdaacsvc.cr.usgs.gov/" + \
-                             "services/appeears-api/"
+        #self.SERVICES_URL = "https://lpdaacsvc.cr.usgs.gov/" + \
+        #                     "services/appeears-api/"
+        self.SERVICES_URL = "https://appeears.earthdatacloud.nasa.gov/api"
 
         # Set products catalogue file
         self.products_pkl = os.path.join(self.datadir, 'products.pkl')
