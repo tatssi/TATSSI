@@ -40,6 +40,10 @@ You can install TATSSI on your favourite Linux distro or if you want to run it o
 
 ## Downloading products from LP DAAC with TATSSI
 
+### NEWS!
+
+  * **LPDAAC went through a major update on July 31, 2023 as version 6.1 of several MODIS products were released. As of October 30, 2023 TATSSI provides direct access to these products.** 
+
 Downloading products from the LP DAAC requires a NASA [EarthData](https://urs.earthdata.nasa.gov/) login. Please, first register as an EarthData user to get login credentials.
 
 * If gedit is not installed in your system:
