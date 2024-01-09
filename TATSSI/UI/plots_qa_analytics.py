@@ -290,8 +290,12 @@ class PlotInterpolation(QtWidgets.QMainWindow):
         # For every interpol method selected by the user
         for method in self.interpolation_methods.selectedItems():
             _method=method.text()
-            tmp_ds = right_plot_sd_masked.interpolate_na(dim='time',
+            if _method == "spline":
+                tmp_ds = right_plot_sd_masked.interpolate_na(dim='time',
                     method=_method)
+            else:
+                tmp_ds = right_plot_sd_masked.interpolate_na(dim='time',
+                    method=_method, fill_value="extrapolate")
 
             # Plot
             tmp_ds.plot(ax = self.ts_p, label=_method, linewidth=2)

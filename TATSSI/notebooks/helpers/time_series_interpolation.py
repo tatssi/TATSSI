@@ -201,8 +201,12 @@ class TimeSeriesInterpolation():
                 tmp_interpol_ds.data = tmp_smoothed
 
             else:
-                tmp_interpol_ds = tmp_ds.interpolate_na(dim='time',
-                    method=method)
+                if method == "spline":
+                    tmp_interpol_ds = tmp_ds.interpolate_na(dim='time',
+                        method=method)
+                else:
+                    tmp_interpol_ds = tmp_ds.interpolate_na(dim='time',
+                        method=method, fill_value="extrapolate")
 
             # Set data type to match the original (non-interpolated)
             tmp_interpol_ds.data = tmp_interpol_ds.data.astype(dtype)
