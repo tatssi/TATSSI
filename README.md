@@ -87,6 +87,7 @@ There are some [Jupyter Notebooks](https://jupyter.org/) associated to each modu
 
 ## Publications <code style="color:orangered">New!</code>
 * TATSSI: A Free and Open-Source Platform for Analyzing Earth Observation Products with Quality Data Assessment. [International Journal of Geo-Information](https://www.mdpi.com/2220-9964/10/4).
+* Time Series Analyses for Sentinel-2 NDVI on Mangroves in Northwestern Mexico (2016-2022). [IEEE 2023 Mexican International Conference on Computer Science](https://ieeexplore.ieee.org/document/10508601).
 
 ### Funding
 TATSSI is funded by "Convocatoria de Proyectos de Desarrollo Científico para Atender Problemas Nacionales 2016" Project No. 2760; P.I.: Inder Tecuapetla. Collaborators: Gerardo Lopez Saldana, Rainer Ressl and Isabel Cruz.
