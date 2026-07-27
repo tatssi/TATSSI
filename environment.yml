@@ -1,0 +1,46 @@
+# TATSSI conda environment - Python 3.12 (numpy 2.x / pandas 3.x)
+# The legacy LP DAAC HTTP data pool was retired, so downloads use the `earthaccess` library.
+name: tatssi
+channels:
+  - conda-forge
+dependencies:
+  - python=3.12
+  # --- Geospatial / IO ---
+  - gdal
+  # GDAL >= 3.9 on conda-forge ships drivers as separate plugins and the
+  # python `gdal` package only pulls libgdal-core. The full `libgdal` meta
+  # package restores every driver: HDF4 (MODIS .hdf), HDF5 (VIIRS .h5),
+  # KML/LIBKML (tiles .kmz), netCDF, etc.
+  - libgdal
+  - rasterio
+  - rioxarray
+  - cartopy
+  - netcdf4
+  - h5py
+  # --- Scientific stack ---
+  - numpy
+  - pandas
+  - xarray
+  - dask
+  - scipy
+  - statsmodels
+  - scikit-learn
+  - numba
+  # --- Plotting ---
+  - matplotlib
+  - seaborn
+  # --- Notebook / widgets UI ---
+  - jupyter
+  - notebook
+  - ipywidgets
+  # --- Qt desktop UI ---
+  - pyqt
+  # --- R integration (changepoint is installed from CRAN in the Dockerfile) ---
+  - r-base
+  - rpy2
+  # --- Downloading ---
+  - requests
+  - earthaccess
+  - earthengine-api
+  - tqdm
+  - pip

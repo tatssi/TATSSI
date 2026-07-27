@@ -1,4 +1,5 @@
 {
     "url": "https://data.lpdaac.earthdatacloud.nasa.gov/",
-    "note": "This is the LP DAAC endpoint for MODIS data"
+    "username": "USERNAME",
+    "password": "PASSWORD"
 }

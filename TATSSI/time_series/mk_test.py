@@ -10,7 +10,7 @@ from __future__ import division
 import numpy as np
 from scipy.stats import norm
 
-from numba import jit
+from numba import jit, prange
 
 @jit(nopython=True)
 def get_s(x, n):
@@ -19,6 +19,52 @@ def get_s(x, n):
         for j in range(k+1, n):
             s += np.sign(x[j] - x[k])
     return s
+
+@jit(nopython=True, parallel=True, cache=True)
+def mk_z_score(x):
+    """
+    Mann-Kendall z statistic for a chunk of pixels.
+
+    :param x: float array (rows, cols, time) - time as the LAST axis, as
+        delivered by xr.apply_ufunc(..., input_core_dims=[['time']])
+    :return: float32 array (rows, cols)
+
+    Numerically identical to the numpy pairwise-sign implementation,
+    including its NaN semantics (any NaN in a pixel series -> z = NaN),
+    but compiled and parallelised over rows with numba prange.
+    """
+    rows, cols, n = x.shape
+    z = np.zeros((rows, cols), np.float32)
+    var_s = (n * (n - 1) * (2 * n + 5)) / 18.0
+    sd = np.sqrt(var_s)
+
+    for i in prange(rows):
+        for j in range(cols):
+            s = 0.0
+            is_nan = False
+            for k in range(n - 1):
+                for l in range(k + 1, n):
+                    d = x[i, j, l] - x[i, j, k]
+                    if d != d:  # NaN
+                        is_nan = True
+                        break
+                    elif d > 0:
+                        s += 1.0
+                    elif d < 0:
+                        s -= 1.0
+                if is_nan:
+                    break
+
+            if is_nan:
+                z[i, j] = np.nan
+            elif s > 0:
+                z[i, j] = (s - 1.0) / sd
+            elif s < 0:
+                z[i, j] = (s + 1.0) / sd
+            else:
+                z[i, j] = 0.0
+
+    return z
 
 def mk_test(x, alpha=0.05, _round=None):
     """

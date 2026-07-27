@@ -13,6 +13,10 @@ from TATSSI.notebooks.helpers.time_series_interpolation import \
 
 import numpy as np
 
+import logging
+logging.basicConfig(level=logging.INFO)
+LOG = logging.getLogger(__name__)
+
 import matplotlib
 matplotlib.use("Qt5Agg")
 import matplotlib.pyplot as plt
@@ -22,7 +26,7 @@ from matplotlib.backends.backend_qt5agg import NavigationToolbar2QT \
 
 import cartopy.crs as ccrs
 import cartopy.feature as cfeature
-import osr
+from osgeo import osr
 
 from PyQt5 import QtCore, QtWidgets, uic
 from PyQt5.QtCore import Qt, pyqtSlot
@@ -247,8 +251,8 @@ class PlotInterpolation(QtWidgets.QMainWindow):
 
         # Delete last reference point
         if len(self.left_p.lines) > 0:
-            del self.left_p.lines[0]
-            del self.right_p.lines[0]
+            self.left_p.lines[0].remove()
+            self.right_p.lines[0].remove()
 
         # Draw a point as a reference
         # Draw a point as a reference
@@ -290,24 +294,36 @@ class PlotInterpolation(QtWidgets.QMainWindow):
         # For every interpol method selected by the user
         for method in self.interpolation_methods.selectedItems():
             _method=method.text()
-            if _method == "spline":
-                tmp_ds = right_plot_sd_masked.interpolate_na(dim='time',
-                    method=_method)
-            else:
-                tmp_ds = right_plot_sd_masked.interpolate_na(dim='time',
-                    method=_method, fill_value="extrapolate")
+            try:
+                if _method == "spline":
+                    tmp_ds = right_plot_sd_masked.interpolate_na(dim='time',
+                        method=_method)
+                else:
+                    tmp_ds = right_plot_sd_masked.interpolate_na(dim='time',
+                        method=_method, fill_value="extrapolate")
+            except ValueError as err:
+                # Interpolators need a minimum number of valid points
+                # (e.g. spline needs > 3). Pixels heavily masked by the
+                # QA selection may not have enough - skip the method.
+                LOG.warning("Cannot interpolate with '%s' for this "
+                            "pixel (%s). Not enough unmasked data?",
+                            _method, err)
+                continue
 
             # Plot
             tmp_ds.plot(ax = self.ts_p, label=_method, linewidth=2)
 
-        # Change ylimits
-        max_val = left_plot_sd.data.max()
-        min_val = left_plot_sd.data.min()
+        # Change ylimits (guard against all-NaN pixels: NaN limits make
+        # matplotlib fail when drawing the axis ticks)
+        max_val = np.nanmax(left_plot_sd.data)
+        min_val = np.nanmin(left_plot_sd.data)
 
         data_range = max_val - min_val
         max_val = max_val + (data_range * 0.2)
         min_val = min_val - (data_range * 0.2)
-        if self.version != "000":
+        if self.version != "000" and \
+                np.isfinite(min_val) and np.isfinite(max_val) and \
+                max_val > min_val:
             self.ts_p.set_ylim([min_val, max_val])
 
         # Legend
@@ -407,7 +423,8 @@ class PlotInterpolation(QtWidgets.QMainWindow):
 
         if self.projection is not None:
             for _axis in [self.left_p, self.right_p]:
-                _axis.coastlines(resolution='10m', color='white')
+                _axis.coastlines(resolution=os.environ.get('TATSSI_MAP_RES', '50m'),
+                        color='white')
                 _axis.add_feature(cfeature.BORDERS, edgecolor='white')
                 _axis.gridlines()
 
@@ -536,7 +553,8 @@ class PlotMaxGapLength(QtWidgets.QMainWindow):
 
         if proj is not None:
             for _axis in [ax, bx]:
-                _axis.coastlines(resolution='10m', color='white')
+                _axis.coastlines(resolution=os.environ.get('TATSSI_MAP_RES', '50m'),
+                        color='white')
                 _axis.add_feature(cfeature.BORDERS, edgecolor='white')
                 _axis.gridlines()
 

@@ -1,7 +1,7 @@
 
 import os
 import sys
-import gdal
+from osgeo import gdal
 from glob import glob
 import datetime as dt
 import numpy as np

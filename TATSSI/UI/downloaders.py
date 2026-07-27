@@ -15,7 +15,7 @@ from TATSSI.qa.EOS.catalogue import Catalogue
 from TATSSI.download.modis_downloader import get_modis_data, LOG
 from TATSSI.download.viirs_downloader import get_viirs_data
 
-import ogr
+from osgeo import ogr
 from datetime import datetime
 
 from PyQt5 import QtCore, QtGui, QtWidgets, uic
@@ -190,7 +190,9 @@ class DownloadersUI(QtWidgets.QDialog):
         layer = d.GetLayer()
         for feature in layer:
             # e.g. h:4 v:7
-            feature = feature.GetField(0)
+            # GDAL 3.x/LIBKML prepends an 'id' field at index 0;
+            # fetch the placemark name by field name instead
+            feature = feature.GetField('Name')
             h, v = feature.split(' ')
             h = int(h.split('h:')[1].strip())
             v = int(v.split('v:')[1].strip())

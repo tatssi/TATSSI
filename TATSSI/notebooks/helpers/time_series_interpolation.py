@@ -22,13 +22,16 @@ from ipywidgets import Select, SelectMultiple, IntProgress
 from ipywidgets import Dropdown, Button, VBox, HBox, BoundedFloatText
 from ipywidgets import interact, interactive, fixed, interact_manual
 
-from beakerx import TableDisplay
+try:
+    from beakerx import TableDisplay
+except Exception:
+    from TATSSI.notebooks.helpers.table_display import TableDisplay
 
 from IPython.display import clear_output
 from IPython.display import display
 
 import json
-import gdal, ogr
+from osgeo import gdal, ogr
 from osgeo import gdal_array
 from osgeo import osr
 import pandas as pd
@@ -404,8 +407,8 @@ class TimeSeriesInterpolation():
 
         # Delete last reference point
         if len(self.left_p.lines) > 0:
-            del self.left_p.lines[0]
-            del self.right_p.lines[0]
+            self.left_p.lines[0].remove()
+            self.right_p.lines[0].remove()
 
         # Draw a point as a reference
         self.left_p.plot(event.xdata, event.ydata,

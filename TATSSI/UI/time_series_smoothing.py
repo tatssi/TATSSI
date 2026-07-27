@@ -195,7 +195,7 @@ class TimeSeriesSmoothingUI(QtWidgets.QMainWindow):
 
         # Delete last reference point
         if len(self.img_p.lines) > 0:
-            del self.img_p.lines[0]
+            self.img_p.lines[0].remove()
 
         # Draw a point as a reference
         self.img_p.plot(event.xdata, event.ydata,

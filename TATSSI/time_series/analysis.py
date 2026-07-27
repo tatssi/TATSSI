@@ -1,6 +1,6 @@
 
 import os
-import gdal
+from osgeo import gdal
 import pandas as pd
 import rasterio as rio
 import logging
@@ -9,6 +9,7 @@ from rasterio import logging as rio_logging
 from statsmodels.tsa.seasonal import seasonal_decompose
 
 from .ts_utils import *
+from TATSSI.input_output.rasterio_compat import open_rasterio
 
 class Analysis():
     """
@@ -43,7 +44,7 @@ class Analysis():
         df = ts.to_dataframe()
 
         result = seasonal_decompose(df['_1_km_16_days_EVI'],
-                model='multiplicative', freq=23, extrapolate_trend='freq')
+                model='multiplicative', period=23, extrapolate_trend='freq')
 
         # climatology = tsa.data._1_km_16_days_EVI[:,600,600].groupby('time.month').mean('time')
 
@@ -91,13 +92,13 @@ class Analysis():
 
         try:
             # Get dataset
-            tmp_ds = xr.open_rasterio(self.fname)
+            tmp_ds = open_rasterio(self.fname)
             tmp_ds = None ; del tmp_ds
         except rio.errors.RasterioIOError as e:
             raise e
 
         chunks = get_chunk_size(self.fname)
-        data_array = xr.open_rasterio(self.fname, chunks=chunks)
+        data_array = open_rasterio(self.fname, chunks=chunks)
 
         data_array = data_array.rename(
                 {'x': 'longitude',
@@ -113,7 +114,7 @@ class Analysis():
         data_array['time'] = times
 
         # Check that _FillValue is not NaN
-        if data_array.nodatavals[0] is np.NaN:
+        if isinstance(data_array.nodatavals[0], float) and np.isnan(data_array.nodatavals[0]):
             # Use _FillValue from band metadata
             _fill_value = get_fill_value_band_metadata(self.fname)
 

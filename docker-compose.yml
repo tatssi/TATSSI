@@ -1,0 +1,35 @@
+# Alternativa a run-tatssi.sh usando docker compose.
+#
+# El codigo de TATSSI se monta como volumen (no esta dentro de la imagen).
+# Antes de lanzar, en el host:
+#   xhost +local:
+#   export HOST_UID=$(id -u) HOST_GID=$(id -g)
+#   export XAUTHORITY="${XAUTHORITY:-$HOME/.Xauthority}"
+# Luego:
+#   docker compose run --rm tatssi
+#
+# NOTA X11: el contenedor corre con TU usuario (no root), por lo que ademas del
+# socket /tmp/.X11-unix hay que pasarle la cookie de autorizacion (XAUTHORITY);
+# sin ella el servidor X rechaza la conexion con "Authorization required...".
+# Esto es identico a lo que hace run-tatssi.sh (monta la cookie en /tmp/.Xauthority).
+services:
+  tatssi:
+    build: .
+    image: tatssi:latest
+    container_name: tatssi
+    # Ejecuta como el usuario del host para conservar permisos en el volumen
+    user: "${HOST_UID:-1000}:${HOST_GID:-1000}"
+    working_dir: /opt/TATSSI/TATSSI/UI
+    environment:
+      - DISPLAY=${DISPLAY}
+      - QT_X11_NO_MITSHM=1
+      - XAUTHORITY=/tmp/.Xauthority
+    volumes:
+      - /tmp/.X11-unix:/tmp/.X11-unix:rw
+      # Cookie de autorizacion X11 del host (definir XAUTHORITY antes de lanzar)
+      - ${XAUTHORITY:-$HOME/.Xauthority}:/tmp/.Xauthority:ro
+      # Repo completo (incluye data/) compartido host <-> contenedor
+      - .:/opt/TATSSI:rw
+    # GUI PyQt5 -> se necesita stdin/tty
+    stdin_open: true
+    tty: true

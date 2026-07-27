@@ -577,7 +577,7 @@ def test3(axis=None):
    plt.clf()
 
    # Load data
-   import gdal
+   from osgeo import gdal
    fname = '/data/ASTER_Global_DEM_V2/20150722122932_1832907520.tif'
    y0 = gdal.Open(fname).ReadAsArray()
    n = 256

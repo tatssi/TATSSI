@@ -2,8 +2,9 @@
 import os
 import sys
 
-import gdal
+from osgeo import gdal
 import xarray as xr
+from TATSSI.input_output.rasterio_compat import open_rasterio
 import numpy as np
 from glob import glob
 import subprocess
@@ -82,7 +83,7 @@ if __name__ == "__main__":
     bands = ds.RasterCount
 
     # 128 best so far
-    data = xr.open_rasterio(vrt_fname,
+    data = open_rasterio(vrt_fname,
                   chunks={'x' : 128, 'y' : 128, 'band' : bands})
 
     data = data.rename(

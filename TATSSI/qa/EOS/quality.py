@@ -1,12 +1,13 @@
 
 import os
-import gdal
+from osgeo import gdal
 from glob import glob
 
 import json
 from collections import OrderedDict
 import pandas as pd
 import xarray as xr
+from TATSSI.input_output.rasterio_compat import open_rasterio
 
 import requests
 import numpy as np
@@ -93,11 +94,6 @@ def qualityDecodeArray(qa_layer_def, fill_value, intValue,
     """
     Function to decode an input array
     """
-    ###qualityDecodeInt_Vect = np.vectorize(quality_decode_from_int)
-    # Create output QA decoded array
-    qualityDecodeArr = np.zeros_like(intValue)
-    qualityDecodeArr.fill(fill_value)
-
     # Get unique values in QA layer
     unique_values = np.unique(intValue)
 
@@ -105,11 +101,26 @@ def qualityDecodeArray(qa_layer_def, fill_value, intValue,
     idx = np.where(unique_values == fill_value)
     unique_values = np.delete(unique_values, idx)
 
+    # Decode every unique value first. Decoded values are the bit pattern
+    # expressed as a decimal number (e.g. 0b1001 -> 1001), so they can be
+    # much larger than what the *input* dtype holds (a VIIRS int8 QA layer
+    # cannot store 1001). numpy >= 2.0 raises OverflowError on such an
+    # assignment (it used to wrap silently, corrupting the decoded codes),
+    # so the output array dtype is sized from the actual decoded values.
+    decoded_values = {}
     for value in unique_values:
-        decoded_value = quality_decode_from_int(qa_layer_def,
-                                                value, bitField,
-                                                qualityCache)
+        decoded_values[value] = quality_decode_from_int(qa_layer_def,
+                                                        value, bitField,
+                                                        qualityCache)
 
+    candidates = list(decoded_values.values()) + [int(fill_value)]
+    out_dtype = np.result_type(np.min_scalar_type(min(candidates)),
+                               np.min_scalar_type(max(candidates)))
+
+    # Create output QA decoded array
+    qualityDecodeArr = np.full(intValue.shape, fill_value, dtype=out_dtype)
+
+    for value, decoded_value in decoded_values.items():
         qualityDecodeArr[intValue == value] = decoded_value
 
     return qualityDecodeArr
@@ -182,7 +193,7 @@ def qualityDecoder(inRst, product, qualityLayer,
         else:
             fill_value
 
-    xr_d = xr.open_rasterio(inRst)
+    xr_d = open_rasterio(inRst)
     if 'nodatavals' in xr_d.attrs:
         try:
             fill_value = int(xr_d.nodatavals[0])

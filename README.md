@@ -6,31 +6,38 @@
 
 [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.4081163.svg)](https://doi.org/10.5281/zenodo.4081163)
 
-## Install using Anaconda
+## Install using Docker (recommended)
+
+The Docker image ships the full TATSSI environment (Python 3.12, GDAL, PyQt,
+R + `changepoint`, `earthaccess`); the code and the `data/` folder are shared
+with the host.
+
+* Requirements:
+  * [Docker](https://docs.docker.com/engine/install/)
+  * xhost utils, to display the GUI through X11:
+    * ```sudo apt install x11-xserver-utils```
+* Clone this repo
+  * ```git clone https://github.com/tatssi/TATSSI```
+* Build the image (the first time takes a while):
+  * ```cd TATSSI```
+  * ```docker build -t tatssi:latest .```
+* Run TATSSI:
+  * ```./run-tatssi.sh```
+
+## Install using Anaconda (alternative)
 
 You can install TATSSI on your favourite Linux distro or if you want to run it on Windows [here](https://github.com/GerardoLopez/TATSSI/wiki/Run-TATSSI-on-Windows-10-using-the-Windows-Subsystem-for-Linux-(WSL)) you can follow the instructions to do it.
 
-* Download conda
-  * ```wget https://repo.continuum.io/archive/Anaconda3-2019.07-Linux-x86_64.sh```
-    * Install conda ```bash ./Anaconda3-2019.07-Linux-x86_64.sh```
-      * Accept the default settings. When asked:
-        ```Do you wish the installer to initialize Anaconda3 by running conda init? [yes|no]```
-        Say: ```yes```
-    * Close that shell and open a new one
+* Download and install [conda](https://www.anaconda.com/download) if you do not have it already
 * Clone this repo
   * ```git clone https://github.com/tatssi/TATSSI```
-* Install the required libraries:
+* Create the environment from the ```environment.yml``` file:
   * ```cd TATSSI```
-  * ```conda install --file tatssi-package-list.txt```
-  * If you wanto to use the [```changepoint```](http://dx.doi.org/10.18637/jss.v058.i03) R package:
-    * Install R
-      * ```sudo apt update```
-      * ```sudo apt-get install r-base```
-    * Install the ```changepoint``` package
-      * Run R with the following command: ```/usr/bin/R```
-      * ```install.packages('changepoint')```
-      * ```install.packages('changepoint.np')```
-      * Exit R with the following command: ```quit()```
+  * ```conda env create -f environment.yml```
+* Activate the environment:
+  * ```conda activate tatssi```
+* If you want to use the [```changepoint```](http://dx.doi.org/10.18637/jss.v058.i03) R package (used by the change point detection tools), install it in the environment R:
+  * ```Rscript -e "install.packages('changepoint', repos='https://cloud.r-project.org')"```
 
 * Run TATSSI
   * If you want to use the Jupyter Notebooks:
@@ -44,7 +51,8 @@ You can install TATSSI on your favourite Linux distro or if you want to run it o
 
   * **LPDAAC went through a major update on July 31, 2023 as version 6.1 of several MODIS products were released. As of October 30, 2023 TATSSI provides direct access to these products.** 
 
-Downloading products from the LP DAAC requires a NASA [EarthData](https://urs.earthdata.nasa.gov/) login. Please, first register as an EarthData user to get login credentials.
+Downloading products from the LP DAAC/Earthdata Cloud requires a NASA [EarthData](https://urs.earthdata.nasa.gov/) login. Please, first register as an EarthData user to get login credentials.
+
 
 * If gedit is not installed in your system:
   * ```sudo apt install gedit```

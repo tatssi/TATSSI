@@ -1,14 +1,15 @@
 
 from smoothn import *
 import xarray as xr
-import gdal
+from TATSSI.input_output.rasterio_compat import open_rasterio
+from osgeo import gdal
 import numpy as np
 from dask.distributed import Client
 
 
 if __name__ == "__main__":
     fname = '/home/glopez/Projects/TATSSI/data/MOD13A2.006/1_km_16_days_EVI/interpolated/MOD13A2.006._1_km_16_days_EVI.linear.tif'
-    d = xr.open_rasterio(fname, chunks={'x' : 256, 'y' : 256, 'band' : 425})
+    d = open_rasterio(fname, chunks={'x' : 256, 'y' : 256, 'band' : 425})
     #g = gdal.Open(fname)
     #d = g.ReadAsArray()
 

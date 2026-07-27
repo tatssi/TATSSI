@@ -1,8 +1,9 @@
 
 import os
 from pathlib import Path
-import gdal
+from osgeo import gdal
 import xarray as xr
+from TATSSI.input_output.rasterio_compat import open_rasterio
 from rasterio import logging as rio_logging
 import subprocess
 from collections import namedtuple
@@ -190,11 +191,17 @@ class Generator():
                     if diver_name == 'HDF4':
                         # SDS name is the last elemtent of : separated string
                         sds_name = sds[0].split(':')[-1]
+                        # GDAL 3.x quotes subdataset field names that contain
+                        # spaces (e.g. '"1 km 16 days NDVI"'); strip the quotes
+                        # so they are not written as literal characters in the
+                        # output directory / file names.
+                        sds_name = sds_name.replace('"', '').strip()
                         sds_name = sds_name.replace(" ", "_")
                     elif diver_name == 'HDF5':
                         # SDS name is the last elemtent of : separated string
                         # and last element of a / substring
                         sds_name = sds[0].split(':')[-1].split('/')[-1]
+                        sds_name = sds_name.replace('"', '').strip()
 
                     if i == 0:
                         # Create output dir
@@ -244,7 +251,7 @@ class Generator():
                               extent=self.extent)
 
             if self.progressBar is not None:
-                self.progressBar.setValue((i/n_files) * 100.0)
+                self.progressBar.setValue(int((i/n_files) * 100.0))
 
         # Create layerstack of bands or subdatasets
         msg = f"Generating {self.product} layer stacks..."
@@ -256,9 +263,16 @@ class Generator():
         for dataset in self.__datasets:
             self.__generate_layerstack(dataset, extension)
 
-        # For the associated product layers, decode the 
+        # For the associated product layers, decode the
         # corresponding bands or sub datasets
         self.__decode_qa(extension)
+
+        msg = (f"Time series generation for {self.product} "
+               f"finished successfully.")
+        LOG.info(msg)
+        if self.progressBar is not None:
+            self.progressBar.setFormat(msg)
+            self.progressBar.setValue(100)
 
     def __get_layerstacks(self):
         """
@@ -369,9 +383,9 @@ class Generator():
             # Read each VRT file
             if chunked == True:
                 chunks = get_chunk_size(vrt)
-                data_array = xr.open_rasterio(vrt, chunks=chunks)
+                data_array = open_rasterio(vrt, chunks=chunks)
             else:
-                data_array = xr.open_rasterio(vrt)
+                data_array = open_rasterio(vrt)
 
             data_array = data_array.rename(
                              {'x': 'longitude',
@@ -391,7 +405,7 @@ class Generator():
                     dataset_name = Path(vrt).stem
 
             # Check that _FillValue is not NaN
-            if data_array.nodatavals[0] is np.NaN:
+            if isinstance(data_array.nodatavals[0], float) and np.isnan(data_array.nodatavals[0]):
                 # Use _FillValue from VRT firts band metadata
                 if _fill_value is None:
                     _fill_value = get_fill_value_band_metadata(vrt)
@@ -476,7 +490,7 @@ class Generator():
                                bitField='ALL', createDir=True)
 
                 if self.progressBar is not None:
-                    self.progressBar.setValue((i/n_files) * 100.0)
+                    self.progressBar.setValue(int((i/n_files) * 100.0))
 
         for qa_layer in qa_layer_names:
             msg = (f"Generating {self.product} QA layer stacks "

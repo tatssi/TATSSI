@@ -1,10 +1,11 @@
 
 import os
 import subprocess
-import gdal
+from osgeo import gdal
 from osgeo import gdal_array
 from osgeo import osr
 import xarray as xr
+from TATSSI.input_output.rasterio_compat import open_rasterio
 import numpy as np
 from glob import glob
 from datetime import datetime
@@ -189,7 +190,7 @@ def get_dataset(vrt_fname):
     bands = gdal.Open(vrt_fname).RasterCount
 
     # 128 best so far
-    data_array = xr.open_rasterio(vrt_fname,
+    data_array = open_rasterio(vrt_fname,
                         chunks={'x' : 128, 'y' : 128, 'band' : bands})
 
     data_array = data_array.rename(

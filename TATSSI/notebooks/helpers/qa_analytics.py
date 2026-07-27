@@ -20,7 +20,10 @@ from ipywidgets import Select, SelectMultiple
 from ipywidgets import Button, HBox, VBox, HTML, IntProgress
 #from ipywidgets import interact, interactive, fixed, interact_manual
 
-from beakerx import TableDisplay
+try:
+    from beakerx import TableDisplay
+except Exception:
+    from TATSSI.notebooks.helpers.table_display import TableDisplay
 
 from IPython.display import clear_output
 from IPython.display import display
@@ -29,7 +32,7 @@ import json
 import collections
 from itertools import groupby as i_groupby
 from itertools import product as i_product
-import gdal, ogr
+from osgeo import gdal, ogr
 import pandas as pd
 import xarray as xr
 import numpy as np
@@ -491,8 +494,15 @@ class Analytics():
                     b.setValue(25)
                     qa_flag_val = v.attrs['nodatavals'][0]
                 else:
-                    qa_flag_val = self.qa_def[(self.qa_def.Name == user_qa) & 
+                    qa_flag_val = self.qa_def[(self.qa_def.Name == user_qa) &
                         (self.qa_def.Description == qa_value)].Value.iloc[0]
+                    # The decoded QA rasters store each bit field as its
+                    # bit pattern expressed in decimal (0b10 -> 10, see
+                    # quality.py quality_decode_from_int), while the
+                    # catalogue stores plain decimal values (2). Convert
+                    # so flags with value >= 2 actually match (0 and 1
+                    # are identical in both conventions).
+                    qa_flag_val = int(np.binary_repr(int(qa_flag_val)))
 
                 if j == 0 :
                     if self.version == "000":
@@ -523,6 +533,16 @@ class Analytics():
         #self.__temp_mask = mask
         #mask = xr.DataArray(np.all(self.__temp_mask, axis=0),
 
+        # Report how much data every single QA layer keeps and the overall
+        # (logical AND) result, so it is easy to spot which QA selection
+        # is masking everything out.
+        for i, user_qa in enumerate(self.user_qa_selection):
+            _pct = (mask[i].sum() / mask[i].size) * 100.0
+            LOG.info(f"QA layer '{user_qa}' keeps {_pct:.2f}% of the data")
+        _pct_all = (np.all(mask, axis=0).sum() / mask[0].size) * 100.0
+        LOG.info(f"All QA layers combined (logical AND) keep "
+                 f"{_pct_all:.2f}% of the data")
+
         mask = xr.DataArray(np.all(mask, axis=0),
                             coords=[v.time.data,
                                     v.latitude.data,
@@ -539,8 +559,11 @@ class Analytics():
         # Create the percentage of data available mask
         # Get the per-pixel per-time step binary mask
         pct_data_available = (self.mask.sum(axis=0) * 100.0) / _time
-        pct_data_available.latitude.data = v.latitude.data
-        pct_data_available.longitude.data = v.longitude.data
+        # Newer xarray forbids assigning to the .data of a dimension
+        # coordinate (IndexVariable); use assign_coords instead.
+        pct_data_available = pct_data_available.assign_coords(
+                latitude=v.latitude.data,
+                longitude=v.longitude.data)
         # Set the pct_data_available object
         self.pct_data_available = pct_data_available
 
@@ -613,11 +636,7 @@ class Analytics():
         Compute the max gep length of a masked time series
         :param b: Progress bar object
         """
-        # TODO
-        # This function should be paralelised! 
-
         bands, rows, cols = self.mask.shape
-        max_gap_length = np.zeros((rows, cols), np.int16)
 
         if not type(b) == QProgressBar and not type(b) == 'PyQt5.QtWidgets.QProgressBar':
             progress_bar = IntProgress(
@@ -634,20 +653,27 @@ class Analytics():
             display(progress_bar)
         else:
             b.setEnabled(True)
+            b.setFormat('Computing maximum gap length...')
 
-        for i in range(rows):
+        # Vectorised max-gap: the longest run of False (masked-out) values
+        # along the time axis, computed with whole-frame numpy operations
+        # (one pass over the time steps instead of a per-pixel Python loop).
+        # Memory: just two (rows, cols) int16 frames besides the mask.
+        gaps = np.asarray(self.mask.data) == False
+        run = np.zeros((rows, cols), np.int16)
+        max_gap_length = np.zeros((rows, cols), np.int16)
+
+        for i in range(bands):
             if type(b) == QProgressBar or type(b) == 'PyQt5.QtWidgets.QProgressBar':
-                b.setFormat('Computing maximum gap length...')
-                b.setValue(int((i*10.)/rows))
+                b.setValue(int((i*10.)/bands))
             else:
-                progress_bar.value = int((i*10.)/rows)
+                progress_bar.value = int((i*10.)/bands)
 
-            for j in range(cols):
-                for key, group in i_groupby(self.mask.data[:,i,j]):
-                    if key == False:
-                        _gap_lenght = len(list(group))
-                        if _gap_lenght > 0 and _gap_lenght > max_gap_length[i,j]:
-                            max_gap_length[i,j] = _gap_lenght
+            run = np.where(gaps[i], run + 1, 0).astype(np.int16)
+            np.maximum(max_gap_length, run, out=max_gap_length)
+
+        gaps = None
+        del(gaps)
 
         if type(b) == QProgressBar or type(b) == 'PyQt5.QtWidgets.QProgressBar':
             b.setValue(0)

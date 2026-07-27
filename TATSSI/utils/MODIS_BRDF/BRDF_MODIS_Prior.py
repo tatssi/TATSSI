@@ -4,8 +4,8 @@ import os
 import sys
 
 import numpy as np
-import gdal
-from gdalconst import *
+from osgeo import gdal
+from osgeo.gdalconst import *
 
 def GetProjectionParams(fname):
     """

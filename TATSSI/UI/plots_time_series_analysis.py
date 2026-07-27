@@ -34,6 +34,26 @@ class PlotAnomalies(QtWidgets.QMainWindow):
         """
         uic.loadUi('plot.ui', self)
 
+        # Mask +/-inf pixels (zero climatology std) so that robust=True can
+        # compute finite percentiles; modern matplotlib raises otherwise.
+        anomalies = anomalies.where(np.isfinite(anomalies))
+
+        # matplotlib 3.1x fails to lay out facet grids whose axis extents
+        # are in the ~1e7 range (sinusoidal metre coordinates), ending in
+        # "Bbox(x0=nan, ...)" from fig.colorbar. Plot in km instead - it is
+        # a display-only rescale, the anomalies data is untouched.
+        ydim, xdim = anomalies.dims[-2], anomalies.dims[-1]
+        try:
+            max_coord = max(abs(float(anomalies[xdim].max())),
+                            abs(float(anomalies[ydim].max())))
+            if max_coord > 1e6:
+                anomalies = anomalies.assign_coords({
+                    xdim: anomalies[xdim] / 1000.0,
+                    ydim: anomalies[ydim] / 1000.0})
+        except (TypeError, ValueError):
+            # Non-numeric coordinates - nothing to rescale
+            pass
+
         a_plot = anomalies.plot.imshow(col='time', robust=True,
                 col_wrap=6, cmap=cmap, aspect=1, size=2)
 

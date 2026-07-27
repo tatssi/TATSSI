@@ -21,13 +21,16 @@ from ipywidgets import Layout
 from ipywidgets import Button, HBox, VBox
 from ipywidgets import interact, interactive, fixed, interact_manual
 
-from beakerx import TableDisplay
+try:
+    from beakerx import TableDisplay
+except Exception:
+    from TATSSI.notebooks.helpers.table_display import TableDisplay
 
 from IPython.display import clear_output
 from IPython.display import display
 
 import json
-import gdal, ogr
+from osgeo import gdal, ogr
 import pandas as pd
 import xarray as xr
 from rasterio import logging as rio_logging
@@ -278,7 +281,9 @@ class Download():
         layer = d.GetLayer()
         for feature in layer:
             # e.g. h:4 v:7
-            feature = feature.GetField(0)
+            # GDAL 3.x/LIBKML prepends an 'id' field at index 0;
+            # fetch the placemark name by field name instead
+            feature = feature.GetField('Name')
             h, v = feature.split(' ')
             h = int(h.split('h:')[1].strip())
             v = int(v.split('v:')[1].strip())

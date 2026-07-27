@@ -1,6 +1,6 @@
 
 import numpy as np
-import gdal
+from osgeo import gdal
 import pandas as pd
 from collections import OrderedDict
 

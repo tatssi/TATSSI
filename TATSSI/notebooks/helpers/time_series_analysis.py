@@ -22,13 +22,16 @@ from ipywidgets import Select, SelectMultiple, IntProgress
 from ipywidgets import Dropdown, Button, VBox, HBox, BoundedFloatText
 from ipywidgets import interact, interactive, fixed, interact_manual
 
-from beakerx import TableDisplay
+try:
+    from beakerx import TableDisplay
+except Exception:
+    from TATSSI.notebooks.helpers.table_display import TableDisplay
 
 from IPython.display import clear_output
 from IPython.display import display
 
 import json
-import gdal, ogr
+from osgeo import gdal, ogr
 from osgeo import gdal_array
 from osgeo import osr
 import pandas as pd
@@ -258,7 +261,7 @@ class TimeSeriesAnalysis():
         self.seasonal_decompose = seasonal_decompose(
                 ts_df[self.data_vars.value],
                 model=self.model.value,
-                freq=self.single_year_ds.shape[0],
+                period=self.single_year_ds.shape[0],
                 extrapolate_trend='freq')
 
         # Plot seasonal decompose
@@ -268,8 +271,9 @@ class TimeSeriesAnalysis():
         self.seasonal_decompose.resid.plot(ax=self.resid)
 
         # Climatology
-        sbn.boxplot(ts_df.index.dayofyear,
-                ts_df[self.data_vars.value],
+        sbn.boxplot(x=ts_df.index.dayofyear,
+                y=ts_df[self.data_vars.value],
+                hue=ts_df.index.dayofyear, palette='husl', legend=False,
                 ax=self.climatology)
         self.climatology.tick_params(axis='x', rotation=70)
 
@@ -305,8 +309,8 @@ class TimeSeriesAnalysis():
 
         # Delete last reference point
         if len(self.left_p.lines) > 0:
-            del self.left_p.lines[0]
-            del self.right_p.lines[0]
+            self.left_p.lines[0].remove()
+            self.right_p.lines[0].remove()
 
         # Draw a point as a reference
         self.left_p.plot(event.xdata, event.ydata,
@@ -333,7 +337,7 @@ class TimeSeriesAnalysis():
         self.seasonal_decompose = seasonal_decompose(
                 ts_df[self.data_vars.value],
                 model=self.model.value,
-                freq=self.single_year_ds.shape[0],
+                period=self.single_year_ds.shape[0],
                 extrapolate_trend='freq')
 
         # Plot seasonal decompose
@@ -358,12 +362,14 @@ class TimeSeriesAnalysis():
                 label='Residuals')
 
         # Climatology
-        sbn.boxplot(ts_df.index.dayofyear,
-                ts_df[self.data_vars.value], ax=self.climatology)
+        sbn.boxplot(x=ts_df.index.dayofyear,
+                y=ts_df[self.data_vars.value],
+                hue=ts_df.index.dayofyear, palette='husl', legend=False,
+                ax=self.climatology)
         # Plot year to analyse
         single_year_df = single_year_ds.to_dataframe()
-        sbn.stripplot(single_year_df.index.dayofyear,
-                single_year_df[self.data_vars.value],
+        sbn.stripplot(x=single_year_df.index.dayofyear,
+                y=single_year_df[self.data_vars.value],
                 color='red', marker='o', size=7, alpha=0.7,
                 ax=self.climatology)
 

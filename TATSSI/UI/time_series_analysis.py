@@ -10,7 +10,9 @@ sys.path.append(str(src_dir.absolute()))
 
 from TATSSI.time_series.smoothn import smoothn
 from TATSSI.time_series.analysis import Analysis
-from TATSSI.time_series.mk_test import mk_test
+from TATSSI.time_series.mk_test import mk_test, mk_z_score
+from TATSSI.time_series.parallel import parallel_changepoints, \
+        parallel_find_peaks
 from TATSSI.UI.plots_time_series_analysis import PlotAnomalies
 from TATSSI.input_output.utils import save_dask_array, \
         get_geotransform_from_xarray, validate_coordinates, \
@@ -20,7 +22,7 @@ from TATSSI.UI.helpers.utils import *
 #from TATSSI.notebooks.helpers.time_series_analysis import \
 #        TimeSeriesAnalysis
 
-import ogr
+from osgeo import ogr
 import xarray as xr
 import numpy as np
 from rasterio import logging as rio_logging
@@ -45,7 +47,7 @@ import cartopy.crs as ccrs
 import cartopy.feature as cfeature
 from cartopy.io.shapereader import Reader as cReader
 from cartopy.feature import ShapelyFeature
-import osr
+from osgeo import osr
 
 from PyQt5 import QtCore, QtGui, QtWidgets, uic
 from PyQt5.QtCore import Qt, pyqtSlot
@@ -220,6 +222,16 @@ class TimeSeriesAnalysisUI(QtWidgets.QMainWindow):
             _data = self.left_ds
 
         def __get_z(x, s=None):
+            # Numba-compiled pairwise z statistic (parallel over rows);
+            # falls back to the original numpy implementation if the JIT
+            # compilation is not available at runtime.
+            try:
+                return mk_z_score(
+                        np.ascontiguousarray(x, dtype=np.float64))
+            except Exception as err:
+                print(f"WARNING: numba mk_z_score failed ({err}); "
+                      f"using numpy fallback")
+
             n = x.shape[2]
 
             for k in range(n-1):
@@ -329,20 +341,23 @@ class TimeSeriesAnalysisUI(QtWidgets.QMainWindow):
         peaks = xr.zeros_like(self.left_ds)
         peaks = peaks.compute()
 
-        layers, rows, cols = self.left_ds.shape
-
         # Set required distance to be consider an independent peak
         # The assumption is that a peak should occure on a different
         # season, hence getting all time steps on a single year / 4
         distance = int(np.ceil(len(self.single_year_ds.time) / 4))
 
-        # TODO Extremely inefficient way to compute peaks and valleys
-        # must be changes for a array-based solution!
-        for c in range(cols):
-            self.progressBar.setValue(int(((c+1) / cols) * 100))
-            for r in range(rows):
-                idx, _ = find_peaks(self.left_ds[:,r,c], distance=distance)
-                peaks[idx,r,c] = 1
+        # Per-pixel peak finding across CPU cores (scipy find_peaks is a
+        # 1D algorithm, but the pixels are independent). Worker count is
+        # capped by CPUs and available RAM (see TATSSI.time_series.parallel).
+        def _progress(frac):
+            self.progressBar.setValue(int(frac * 100))
+            QtWidgets.QApplication.processEvents()
+
+        _data = self.left_ds.compute() if self.left_ds.chunks is not None \
+                else self.left_ds
+        peaks_np = parallel_find_peaks(_data.values, distance=distance,
+                progress_cb=_progress)
+        peaks.data = peaks_np.astype(peaks.dtype)
 
         # Get the number of peaks and valleys on a calendar year
         annual_peaks = peaks.groupby("time.year")
@@ -438,7 +453,9 @@ class TimeSeriesAnalysisUI(QtWidgets.QMainWindow):
             _idx = 'time.dayofyear'
 
         period_averages = self.left_ds.groupby(_idx)
-        period_averages = period_averages.mean(axis=0).astype(dtype)
+        # Newer xarray forbids passing 'axis' to a GroupBy reduction (it sets
+        # 'dim' internally); mean() reduces over the grouped dimension.
+        period_averages = period_averages.mean().astype(dtype)
 
         if self.model.currentText()[0] == 'a':
             period_averages -= period_averages.mean(axis=0).astype(dtype)
@@ -504,8 +521,10 @@ class TimeSeriesAnalysisUI(QtWidgets.QMainWindow):
         # Wait cursor
         QtWidgets.QApplication.setOverrideCursor(Qt.WaitCursor)
 
-        self.left_imshow.set_data(self.single_year_ds.data[index])
-        self.right_imshow.set_data(self.single_year_ds.data[index])
+        self.left_imshow.set_data(
+                self.__mask_fill(self.single_year_ds[index]).data)
+        self.right_imshow.set_data(
+                self.__mask_fill(self.single_year_ds[index]).data)
 
         # Set titles
         self.left_p.set_title(self.time_steps_left.currentText())
@@ -798,6 +817,20 @@ class TimeSeriesAnalysisUI(QtWidgets.QMainWindow):
 
     @pyqtSlot()
     def __plotAnomalies(self):
+        # Guard: standard anomalies can be entirely NaN/inf when the
+        # climatology std is zero (e.g. a single-year time series).
+        # Modern matplotlib raises (Bbox NaN) instead of drawing an
+        # empty facet grid, so inform the user and bail out.
+        if not np.isfinite(np.asarray(self.anomalies.data)).any():
+            message_text = (
+                'The standard anomalies are all NaN/infinite. This '
+                'usually means the climatology standard deviation is '
+                'zero - e.g. the time series only contains one year '
+                'of data. Load a time series with at least 2 years '
+                'to compute standard anomalies.')
+            self.message_box(message_text)
+            return None
+
         dialog = PlotAnomalies(self)
         self.dialogs.append(dialog)
         dialog._plot(self.anomalies, self.years.currentText())
@@ -885,8 +918,8 @@ class TimeSeriesAnalysisUI(QtWidgets.QMainWindow):
 
         # Delete last reference point
         if len(self.left_p.lines) > 0:
-            del self.left_p.lines[0]
-            del self.right_p.lines[0]
+            self.left_p.lines[0].remove()
+            self.right_p.lines[0].remove()
 
         # Check whether the x and y data are coming from the user or
         # from the map plot click event
@@ -990,18 +1023,31 @@ class TimeSeriesAnalysisUI(QtWidgets.QMainWindow):
         # Climatology
         #   check if data is monthly to group by month
         unique_diffs = np.sort(np.unique(np.diff(ts_df.index.month.values)))
-        if unique_diffs[0] == -11 and unique_diffs[1] == 1:
+        monthly = unique_diffs[0] == -11 and unique_diffs[1] == 1
+        if monthly:
             _idx = ts_df.index.month
         else:
             _idx = ts_df.index.dayofyear
 
-        sbn.boxplot(_idx,
-                ts_df[self.data_vars.currentText()], ax=self.climatology)
-        # Plot year to analyse
+        # seaborn >= 0.12 no longer colours each box by default; pass the
+        # category as hue with the default cycle palette to keep the
+        # per-period colours the old seaborn used
+        sbn.boxplot(x=_idx,
+                y=ts_df[self.data_vars.currentText()],
+                hue=_idx, palette='husl', legend=False,
+                ax=self.climatology)
+        # Plot year to analyse. The overlay MUST use the same period
+        # grouping as the boxplot: modern seaborn shares a categorical
+        # axis between calls, so mixing month boxes with dayofyear points
+        # appends the days as new categories after the monthly boxes
+        # (points fall outside the boxes and the axis shows days).
         single_year_df = single_year_ds.to_dataframe()
-        sbn.stripplot(x=single_year_df.index.dayofyear,
+        _idx_year = (single_year_df.index.month if monthly
+                     else single_year_df.index.dayofyear)
+        sbn.stripplot(x=_idx_year,
                 y=single_year_df[self.data_vars.currentText()],
                 color='red', marker='o', size=7, alpha=0.7,
+                label=self.years.currentText(),
                 ax=self.climatology)
 
         self.climatology.tick_params(axis='x', rotation=70)
@@ -1019,7 +1065,10 @@ class TimeSeriesAnalysisUI(QtWidgets.QMainWindow):
             # Plot vertical line where the changepoint was found
             for i, i_cpt in enumerate(changepoints):
                 i_cpt = int(i_cpt) + 1
-                cpt_index = self.seasonal_decompose.trend.index[i_cpt]
+                # Use the current pixel's own time axis so this does not
+                # depend on the statsmodels decomposition (which may be
+                # skipped for series shorter than 2 years).
+                cpt_index = left_plot_sd.time.data[i_cpt]
                 if i == 0 :
                     self.trend_p.axvline(cpt_index, color='black',
                             lw='1.0', label='Change point')
@@ -1037,9 +1086,17 @@ class TimeSeriesAnalysisUI(QtWidgets.QMainWindow):
         self.resid_p.legend(loc='best', fontsize='small',
                 fancybox=True, framealpha=0.5)
 
-        #self.climatology.legend([self.years.value], loc='best',
-        self.climatology.legend(loc='best',
-                fontsize='small', fancybox=True, framealpha=0.5)
+        # Only draw the legend when there are labelled artists (the
+        # boxplot uses legend=False; without this guard matplotlib warns
+        # "No artists with labels found to put in legend")
+        handles, labels = self.climatology.get_legend_handles_labels()
+        if handles:
+            # seaborn's categorical stripplot repeats the label once per
+            # category (12x monthly / 365x daily); keep unique labels only
+            unique = dict(zip(labels, handles))
+            self.climatology.legend(unique.values(), unique.keys(),
+                    loc='best', fontsize='small', fancybox=True,
+                    framealpha=0.5)
 
         self.climatology.set_title('Climatology')
 
@@ -1100,7 +1157,8 @@ class TimeSeriesAnalysisUI(QtWidgets.QMainWindow):
         # Wait cursor
         QtWidgets.QApplication.setOverrideCursor(Qt.WaitCursor)
 
-        self.left_imshow.set_data(self.single_year_ds.data[index])
+        self.left_imshow.set_data(
+                self.__mask_fill(self.single_year_ds[index]).data)
 
         # Set titles
         self.left_p.set_title(self.time_steps_left.currentText())
@@ -1123,7 +1181,8 @@ class TimeSeriesAnalysisUI(QtWidgets.QMainWindow):
         # Wait cursor
         QtWidgets.QApplication.setOverrideCursor(Qt.WaitCursor)
 
-        self.right_imshow.set_data(self.single_year_ds.data[index])
+        self.right_imshow.set_data(
+                self.__mask_fill(self.single_year_ds[index]).data)
 
         # Set titles
         self.right_p.set_title(self.time_steps_right.currentText())
@@ -1134,15 +1193,33 @@ class TimeSeriesAnalysisUI(QtWidgets.QMainWindow):
         # Standard cursor
         QtWidgets.QApplication.restoreOverrideCursor()
 
+    def __mask_fill(self, data_array):
+        """
+        Display-only helper: mask the fill value (attrs['nodatavals'])
+        as NaN so imshow renders it as no-data (transparent) instead of
+        a valid colour, and the colour range stretches over real data.
+        The underlying dataset is NOT modified.
+        """
+        nodatavals = getattr(data_array, 'attrs', {}).get('nodatavals', ())
+        if len(nodatavals) == 0:
+            nodatavals = self.single_year_ds.attrs.get('nodatavals', ())
+        if len(nodatavals) > 0 and nodatavals[0] is not None and \
+                not (isinstance(nodatavals[0], float)
+                     and np.isnan(nodatavals[0])):
+            return data_array.where(data_array != nodatavals[0])
+        return data_array
+
     def __update_imshow(self):
         """
         Update images shown as imshow plots
         """
-        self.left_imshow = self.single_year_ds[0].plot.imshow(
+        _frame = self.__mask_fill(self.single_year_ds[0])
+
+        self.left_imshow = _frame.plot.imshow(
                 cmap=self.cmap, ax=self.left_p, add_colorbar=False,
                 transform=self.projection)
 
-        self.right_imshow = self.single_year_ds[0].plot.imshow(
+        self.right_imshow = _frame.plot.imshow(
                 cmap=self.cmap, ax=self.right_p, add_colorbar=False,
                 transform=self.projection)
 
@@ -1175,17 +1252,40 @@ class TimeSeriesAnalysisUI(QtWidgets.QMainWindow):
         # Seasonal decompose
         left_plot_sd = self.left_ds[:, int(_rows / 2), int(_cols / 2)]
         ts_df = left_plot_sd.to_dataframe()
-        self.seasonal_decompose = seasonal_decompose(
-                ts_df[self.data_vars.currentText()],
-                model=self.model.currentText(),
-                freq=self.single_year_ds.shape[0],
-                extrapolate_trend='freq')
 
-        # Plot seasonal decompose
-        self.seasonal_decompose.observed.plot(ax=self.observed)
-        self.seasonal_decompose.trend.plot(ax=self.trend_p)
-        self.seasonal_decompose.seasonal.plot(ax=self.seasonal_p)
-        self.seasonal_decompose.resid.plot(ax=self.resid_p)
+        # statsmodels' seasonal_decompose requires at least 2 complete
+        # seasonal cycles. If the loaded series is shorter than 2 years,
+        # skip the decomposition (instead of crashing) and tell the user.
+        period = int(self.single_year_ds.shape[0])
+        n_obs = int(ts_df[self.data_vars.currentText()].shape[0])
+
+        if n_obs < 2 * period:
+            self.seasonal_decompose = None
+            msg = (f"Seasonal decompose needs at least 2 complete years "
+                   f"({2 * period} observations); the loaded series only "
+                   f"has {n_obs}. Load a time series of >= 2 years to see "
+                   f"the seasonal decomposition.")
+            print(f"WARNING: {msg}")
+            for _ax in (self.observed, self.trend_p,
+                        self.seasonal_p, self.resid_p):
+                _ax.clear()
+                _ax.text(0.5, 0.5, "Needs >= 2 years of data",
+                         ha='center', va='center',
+                         transform=_ax.transAxes, fontsize=8)
+                _ax.set_xticks([])
+                _ax.set_yticks([])
+        else:
+            self.seasonal_decompose = seasonal_decompose(
+                    ts_df[self.data_vars.currentText()],
+                    model=self.model.currentText(),
+                    period=period,
+                    extrapolate_trend='freq')
+
+            # Plot seasonal decompose
+            self.seasonal_decompose.observed.plot(ax=self.observed)
+            self.seasonal_decompose.trend.plot(ax=self.trend_p)
+            self.seasonal_decompose.seasonal.plot(ax=self.seasonal_p)
+            self.seasonal_decompose.resid.plot(ax=self.resid_p)
 
         # Climatology
         #   check if data is monthly to group by month
@@ -1195,8 +1295,9 @@ class TimeSeriesAnalysisUI(QtWidgets.QMainWindow):
         else:
             _idx = ts_df.index.dayofyear
 
-        sbn.boxplot(_idx,
-                ts_df[self.data_vars.currentText()],
+        sbn.boxplot(x=_idx,
+                y=ts_df[self.data_vars.currentText()],
+                hue=_idx, palette='husl', legend=False,
                 ax=self.climatology)
         self.climatology.tick_params(axis='x', rotation=70)
 
@@ -1235,12 +1336,37 @@ class TimeSeriesAnalysisUI(QtWidgets.QMainWindow):
         self.left_p = plt.subplot2grid((4, 4), (0, 0), rowspan=2,
                 projection=self.projection)
         self.right_p = plt.subplot2grid((4, 4), (0, 1), rowspan=2,
-                sharex=self.left_p, sharey=self.left_p,
                 projection=self.projection)
+        self.__syncing_views = False
+
+        def _sync_views(source, target):
+            def _on_lims_changed(_ax):
+                if self.__syncing_views:
+                    return
+                if np.allclose(source.get_xlim(), target.get_xlim()) and \
+                        np.allclose(source.get_ylim(), target.get_ylim()):
+                    return
+                self.__syncing_views = True
+                try:
+                    target.set_xlim(source.get_xlim())
+                    target.set_ylim(source.get_ylim())
+                finally:
+                    self.__syncing_views = False
+            return _on_lims_changed
+
+        self.left_p.callbacks.connect(
+                'xlim_changed', _sync_views(self.left_p, self.right_p))
+        self.left_p.callbacks.connect(
+                'ylim_changed', _sync_views(self.left_p, self.right_p))
+        self.right_p.callbacks.connect(
+                'xlim_changed', _sync_views(self.right_p, self.left_p))
+        self.right_p.callbacks.connect(
+                'ylim_changed', _sync_views(self.right_p, self.left_p))
 
         if self.projection is not None:
             for _axis in [self.left_p, self.right_p]:
-                _axis.coastlines(resolution='10m', color='white')
+                _axis.coastlines(resolution=os.environ.get('TATSSI_MAP_RES', '50m'),
+                        color='white')
                 _axis.add_feature(cfeature.BORDERS, edgecolor='white')
                 _axis.gridlines()
 
@@ -1320,34 +1446,26 @@ class TimeSeriesAnalysisUI(QtWidgets.QMainWindow):
         trend = trend.compute()
         trend.attrs = self.left_ds.attrs
 
+        # CPD methods (same statistics as the previous serial loop)
+        _method = 'BinSeg'
+        _penalty = 'SIC'
+
+        # Per-pixel change point detection across CPU cores. Each worker
+        # process runs its own embedded R (`changepoint` via rpy2); the
+        # worker count is capped by CPUs and available RAM (see
+        # TATSSI.time_series.parallel, override with TATSSI_WORKERS).
+        def _progress(frac):
+            self.progressBar.setValue(int(frac * 100))
+            QtWidgets.QApplication.processEvents()
+
+        output_np = parallel_changepoints(
+                trend.values, test_stat='Normal', method=_method,
+                penalty=_penalty, progress_cb=_progress)
+
         # Output data
         output = xr.zeros_like(trend).astype(np.int16).load()
         output.attrs = self.left_ds.attrs
-
-        layers, rows, cols = trend.shape
-
-        for x in range(cols):
-            self.progressBar.setValue(int((x / cols) * 100))
-            for y in range(rows):
-                _data = trend[:,y,x]
-                r_vector = FloatVector(_data)
-
-                #changepoint_r = self.cpt.cpt_mean(r_vector)
-                #changepoints_r = self.cpt.cpt_var(r_vector, method='PELT',
-                #        penalty='Manual', pen_value='2*log(n)')
-
-                # CPD methods
-                _method = 'BinSeg'
-                _penalty = 'SIC'
-
-                changepoints_r = self.cpt.cpt_meanvar(r_vector,
-                        test_stat='Normal', method=_method, penalty=_penalty)
-
-                changepoints = numpy2ri.rpy2py(
-                        self.cpt.cpts(changepoints_r)).astype(int)
-
-                if changepoints.shape[0] > 0:
-                    output[changepoints+1, y, x] = True
+        output.data = output_np
 
         fname = (f'{os.path.splitext(self.fname)[0]}'
                      f'_change_points.tif')

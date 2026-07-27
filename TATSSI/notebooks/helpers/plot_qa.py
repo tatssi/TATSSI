@@ -22,15 +22,19 @@ from ipywidgets import Layout
 from ipywidgets import Button, HBox, VBox
 from ipywidgets import interact, interactive, fixed, interact_manual
 
-from beakerx import TableDisplay
+try:
+    from beakerx import TableDisplay
+except Exception:
+    from TATSSI.notebooks.helpers.table_display import TableDisplay
 
 from IPython.display import clear_output
 from IPython.display import display
 
 import json
-import gdal, ogr
+from osgeo import gdal, ogr
 import pandas as pd
 import xarray as xr
+from TATSSI.input_output.rasterio_compat import open_rasterio
 from rasterio import logging as rio_logging
 from datetime import datetime
 
@@ -71,7 +75,7 @@ class PlotQA():
         Plot QA flags using raster category names
         """
         # Open dataset
-        qa = xr.open_rasterio(qa_fname)
+        qa = open_rasterio(qa_fname)
 
         # Get categories
         ds = gdal.Open(qa_fname)

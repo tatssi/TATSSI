@@ -1,6 +1,6 @@
 
 import os
-import gdal
+from osgeo import gdal
 import numpy as np
 import xarray as xr
 from rasterio import logging as rio_logging
@@ -168,10 +168,19 @@ def get_fill_value_band_metadata(fname):
     _tmp_fill_values = []
     for key, value in _md.items():
         if 'fillvalue' in key.lower():
-            if value == 'nan' or value == np.NaN:
-                _tmp_fill_values.append(np.NaN)
+            if value == 'nan' or (isinstance(value, float)
+                    and np.isnan(value)):
+                _tmp_fill_values.append(np.nan)
             else:
-                _tmp_fill_values.append(int(float(value)))
+                # Some products (e.g. VIIRS VNP/VJ1) list several
+                # space-separated fill values in a single metadata item
+                # (e.g. '-15000 -13000'); use the first numeric token
+                for token in str(value).split():
+                    try:
+                        _tmp_fill_values.append(int(float(token)))
+                        break
+                    except ValueError:
+                        continue
 
     if len(_tmp_fill_values) > 0:
         return _tmp_fill_values[0]

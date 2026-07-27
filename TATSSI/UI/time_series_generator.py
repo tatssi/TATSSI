@@ -16,11 +16,12 @@ from TATSSI.qa.EOS.catalogue import Catalogue
 from TATSSI.time_series.generator import Generator
 from TATSSI.UI.plot_time_series_generator import PlotExtent
 
-import gdal
+from osgeo import gdal
 import xarray as xr
+from TATSSI.input_output.rasterio_compat import open_rasterio
 from glob import glob
 
-import ogr
+from osgeo import ogr
 from datetime import datetime
 import tempfile
 
@@ -127,9 +128,9 @@ class TimeSeriesGeneratorUI(QtWidgets.QDialog):
             Translate(source_img=sd[0][0],
                     target_img=tmp_fname)
 
-            data = xr.open_rasterio(tmp_fname)
+            data = open_rasterio(tmp_fname)
         else:
-            data = xr.open_rasterio(fname)
+            data = open_rasterio(fname)
 
         # Delete tmp file
         try:

@@ -1,7 +1,8 @@
 
 import os
-import gdal
+from osgeo import gdal
 import xarray as xr
+from TATSSI.input_output.rasterio_compat import open_rasterio
 from dask.distributed import Client
 from dask.diagnostics import ProgressBar
 import rasterio as rio
@@ -115,13 +116,13 @@ class Smoothing():
 
         try:
             # Get dataset
-            tmp_ds = xr.open_rasterio(self.fname)
+            tmp_ds = open_rasterio(self.fname)
             tmp_ds = None ; del tmp_ds
         except rio.errors.RasterioIOError as e:
             raise e
 
         chunks = get_chunk_size(self.fname)
-        data_array = xr.open_rasterio(self.fname, chunks=chunks)
+        data_array = open_rasterio(self.fname, chunks=chunks)
 
         data_array = data_array.rename(
                 {'x': 'longitude',

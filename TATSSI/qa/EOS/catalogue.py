@@ -26,7 +26,9 @@ class Catalogue():
             default_products = ['Terra MODIS',
                                 'Aqua MODIS',
                                 'Combined MODIS',
-                                'S-NPP NASA VIIRS',
+                                'Suomi NPP VIIRS',
+                                'NOAA-20 VIIRS',
+                                'NOAA-21 VIIRS'
                                 'WELD']
 
         self.default_products = default_products

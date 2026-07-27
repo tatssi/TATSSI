@@ -1,8 +1,9 @@
 
 import numpy as np
 import xarray as xr
+from TATSSI.input_output.rasterio_compat import open_rasterio
 
-d = xr.open_rasterio('VI_Usefulness.vrt')
+d = open_rasterio('VI_Usefulness.vrt')
 
 qa = [0,    1,   10,   11,  100,  101,  110,  111, 1000, 1001, 1010, 1111]
 
