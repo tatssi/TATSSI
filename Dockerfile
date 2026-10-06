@@ -9,7 +9,7 @@
 # mas ligera y el codigo + la carpeta data/ quedan compartidos entre host y
 # contenedor con los permisos del usuario del host.
 
-FROM continuumio/miniconda3:23.5.2-0
+FROM continuumio/miniconda3:26.7.1-1
 
 ENV DEBIAN_FRONTEND=noninteractive \
     TATSSI_ENV=tatssi \
@@ -21,7 +21,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
         curl \
         bzip2 \
         ca-certificates \
-        libgl1-mesa-glx \
+        libgl1 \
+        libglx-mesa0 \
         libglib2.0-0 \
         libsm6 \
         libxext6 \
